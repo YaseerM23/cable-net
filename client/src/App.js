@@ -1,14 +1,21 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom"
-import { AuthProvider } from "./contexts/AuthContext"
-import ProtectedRoute from "./components/ProtectedRoute"
-import Layout from "./components/Layout"
-import Login from "./components/Login"
-import Dashboard from "./pages/Dashboard"
-import NetworkMap from "./pages/NetworkMap"
-import Locations from "./pages/Locations"
-import Services from "./pages/Services"
-import ServiceTypes from "./pages/ServiceTypes"
-import "./App.css"
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
+import { AuthProvider } from "./contexts/AuthContext";
+import ProtectedRoute from "./components/ProtectedRoute";
+import Layout from "./components/Layout";
+import Login from "./components/Login";
+import Dashboard from "./pages/Dashboard";
+import NetworkMap from "./pages/NetworkMap";
+import Locations from "./pages/Locations";
+import Services from "./pages/Services";
+import ServiceTypes from "./pages/ServiceTypes";
+import "./App.css";
+import MapProvider from "./components/Map/MapProvider";
+import { SearchBox } from "./components/Map/AutoComplete";
 
 function App() {
   return (
@@ -33,7 +40,19 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Layout>
-                    <NetworkMap />
+                    <MapProvider
+                      overlay={
+                        <>
+                          <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-20 w-full max-w-lg px-4">
+                            <div className="bg-white shadow-lg rounded-xl border border-gray-200 overflow-hidden">
+                              <SearchBox />
+                            </div>
+                          </div>
+                        </>
+                      }
+                    >
+                      <NetworkMap />
+                    </MapProvider>
                   </Layout>
                 </ProtectedRoute>
               }
@@ -72,7 +91,7 @@ function App() {
         </div>
       </Router>
     </AuthProvider>
-  )
+  );
 }
 
-export default App
+export default App;
