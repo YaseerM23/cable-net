@@ -1,15 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import axios from "axios";
-import OLAMap from "../components/OLAMap";
 import AddLocationModal from "../components/AddLocationModal";
 import NetworkAnalytics from "../components/NetworkAnalytics";
 import AdvancedFilters from "../components/AdvancedFilters";
 import NetworkExport from "../components/NetworkExport";
 import { CENTRAL_HUB, useMap } from "../components/Map/MapProvider";
 import polyline from "polyline";
-import { SearchBox } from "../components/Map/AutoComplete";
 import MapWithSearch from "../components/Map/MapWithSearch";
 
 const NetworkMap = () => {
@@ -22,100 +20,271 @@ const NetworkMap = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [clickedCoordinates, setClickedCoordinates] = useState(null);
   const [success, setSuccess] = useState("");
+  const [hoveredLocation, setHoveredLocation] = useState(null);
   const { map, olaMaps } = useMap();
+  const isMapLoaded = useRef(false);
+  const cleanupScheduled = useRef(false);
 
-  useEffect(() => {
-    if (!map || !olaMaps) return; // wait until they are ready
-    fetchData();
-  }, [map, olaMaps]);
+  // Earth's radius in meters
+  const EARTH_RADIUS = 6378137;
 
-  function createLocationMarkerElement(icon) {
+  // Create location marker with hover functionality
+  const createLocationMarkerElement = useCallback((location) => {
     // Create container
     const el = document.createElement("div");
     el.className =
-      "w-10 h-10 flex items-center justify-center rounded-full shadow-lg border border-gray-300 bg-white hover:scale-110 transition-transform duration-200";
+      "w-10 h-10 flex items-center justify-center rounded-full shadow-lg border border-gray-300 bg-white hover:scale-110 transition-transform duration-200 cursor-pointer";
 
-    // Add icon inside (emoji or font-awesome class)
+    // Add icon inside
     const span = document.createElement("span");
-    span.className = "text-xl"; // size
-    span.innerText = icon; // can be emoji like 📶 or 🌐
+    span.className = "text-xl";
+    span.innerText = location.serviceType?.icon || "📍";
     el.appendChild(span);
 
-    return el;
-  }
-
-  async function renderConnections(connections) {
-    try {
-      for (let conn of connections) {
-        olaMaps
-          .addMarker({
-            element: createLocationMarkerElement(conn.serviceType.icon),
-            anchor: "center",
-          })
-          .setLngLat([
-            Number(conn.coordinates.longitude),
-            Number(conn.coordinates.latitude),
-          ])
-          .addTo(map);
+    // Add hover effect for showing location info
+    const popupDiv = document.createElement("div");
+    popupDiv.className =
+      "location-popup hidden absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 bg-white p-3 rounded shadow-lg border z-10 w-64";
+    popupDiv.innerHTML = `
+      <div class="font-bold text-gray-800">${
+        location.serviceName?.name || "Unknown Service"
+      }</div>
+      <div class="text-sm text-gray-600 mt-1">${
+        location.serviceType?.name || "Unknown Type"
+      }</div>
+      <div class="text-xs text-gray-500 mt-2">
+        <div>Lat: ${location.coordinates?.latitude?.toFixed(6) || "N/A"}</div>
+        <div>Lng: ${location.coordinates?.longitude?.toFixed(6) || "N/A"}</div>
+      </div>
+      <div class="text-xs text-gray-500 mt-1">Distance: ${
+        location.distanceFromCentralHub || 0
+      }m</div>
+      ${
+        location.notes
+          ? `<div class="text-xs text-gray-500 mt-1 truncate">${location.notes}</div>`
+          : ""
       }
-      const locationString = connections
-        .map(
-          (conn) =>
-            `${conn.coordinates.latitude}%2C${conn.coordinates.longitude}`
-        )
-        .join("%7C");
-      console.log("This si the locatio string passing ::) ", locationString);
-      const response = await fetch(
-        `https://api.olamaps.io/routing/v1/distanceMatrix?origins=${CENTRAL_HUB.lat}%2C${CENTRAL_HUB.lng}&destinations=${locationString}&api_key=dxEuToWnHB5W4e4lcqiFwu2RwKA64Ixi0BFR73kQ`,
-        {
-          method: "GET",
-          headers: { "X-Request-Id": "XXX" },
+      <div class="text-xs text-gray-400 mt-1">${new Date(
+        location.createdAt
+      ).toLocaleString()}</div>
+    `;
+
+    el.appendChild(popupDiv);
+
+    // Show popup on mouseenter
+    el.addEventListener("mouseenter", () => {
+      popupDiv.classList.remove("hidden");
+      setHoveredLocation(location);
+    });
+
+    // Hide popup on mouseleave
+    el.addEventListener("mouseleave", () => {
+      popupDiv.classList.add("hidden");
+      setHoveredLocation(null);
+    });
+
+    return el;
+  }, []);
+
+  // Calculate destination point given distance and bearing from a start point
+  const calculateDestinationPoint = useCallback(
+    (lat, lng, distance, bearing) => {
+      // Convert degrees to radians
+      const latRad = (lat * Math.PI) / 180;
+      const lngRad = (lng * Math.PI) / 180;
+      const bearingRad = (bearing * Math.PI) / 180;
+
+      // Calculate destination point
+      const angularDistance = distance / EARTH_RADIUS;
+
+      const lat2 = Math.asin(
+        Math.sin(latRad) * Math.cos(angularDistance) +
+          Math.cos(latRad) * Math.sin(angularDistance) * Math.cos(bearingRad)
+      );
+
+      const lng2 =
+        lngRad +
+        Math.atan2(
+          Math.sin(bearingRad) * Math.sin(angularDistance) * Math.cos(latRad),
+          Math.cos(angularDistance) - Math.sin(latRad) * Math.sin(lat2)
+        );
+
+      // Convert back to degrees
+      return {
+        lat: (lat2 * 180) / Math.PI,
+        lng: (lng2 * 180) / Math.PI,
+      };
+    },
+    []
+  );
+
+  // Create circle coordinates for a given radius
+  const createCircleCoordinates = useCallback(
+    (centerLat, centerLng, radius) => {
+      const points = [];
+      const numPoints = 64; // Number of points to approximate the circle
+
+      for (let i = 0; i <= numPoints; i++) {
+        const bearing = (i * 360) / numPoints;
+        const point = calculateDestinationPoint(
+          centerLat,
+          centerLng,
+          radius,
+          bearing
+        );
+        points.push([point.lng, point.lat]); // Note: [lng, lat] for GeoJSON
+      }
+
+      return points;
+    },
+    [calculateDestinationPoint]
+  );
+
+  // Safe function to check if layer exists before removing
+  const safeRemoveLayer = useCallback((mapInstance, layerId) => {
+    if (mapInstance && mapInstance.getLayer && mapInstance.getLayer(layerId)) {
+      mapInstance.removeLayer(layerId);
+    }
+  }, []);
+
+  // Safe function to check if source exists before removing
+  const safeRemoveSource = useCallback((mapInstance, sourceId) => {
+    if (
+      mapInstance &&
+      mapInstance.getSource &&
+      mapInstance.getSource(sourceId)
+    ) {
+      mapInstance.removeSource(sourceId);
+    }
+  }, []);
+
+  // Draw concentric circles at specified intervals - with map loaded check
+  const drawRadiusCircles = useCallback(
+    (maxDistance = 1000, interval = 100) => {
+      if (!map || !isMapLoaded.current) return;
+
+      try {
+        // Remove existing radius circles if they exist
+        safeRemoveLayer(map, "radius-circles-layer");
+        safeRemoveLayer(map, "radius-circles-labels");
+        safeRemoveSource(map, "radius-circles");
+
+        // Calculate how many circles to draw
+        const numCircles = Math.ceil(maxDistance / interval);
+
+        // Create GeoJSON for circles
+        const circleFeatures = [];
+
+        for (let i = 1; i <= numCircles; i++) {
+          const radius = i * interval;
+          const coordinates = createCircleCoordinates(
+            parseFloat(CENTRAL_HUB.lat),
+            parseFloat(CENTRAL_HUB.lng),
+            radius
+          );
+
+          // Create a line string for the circle
+          circleFeatures.push({
+            type: "Feature",
+            geometry: {
+              type: "LineString",
+              coordinates: coordinates,
+            },
+            properties: {
+              radius: radius,
+              // Use different opacity based on distance (further = more transparent)
+              opacity: Math.max(0.2, 1 - i * 0.1),
+              // Use a consistent color with varying opacity
+              color: `rgba(52, 152, 219, ${Math.max(0.2, 1 - i * 0.1)})`,
+            },
+          });
+
+          // Add a label for every other circle or for significant distances
+          if (radius % 200 === 0 || radius === interval) {
+            circleFeatures.push({
+              type: "Feature",
+              geometry: {
+                type: "Point",
+                coordinates: [
+                  calculateDestinationPoint(
+                    parseFloat(CENTRAL_HUB.lat),
+                    parseFloat(CENTRAL_HUB.lng),
+                    radius,
+                    0
+                  ).lng,
+                  calculateDestinationPoint(
+                    parseFloat(CENTRAL_HUB.lat),
+                    parseFloat(CENTRAL_HUB.lng),
+                    radius,
+                    0
+                  ).lat,
+                ],
+              },
+              properties: {
+                radius: radius,
+                type: "label",
+                label: `${radius}m`,
+                color: `rgba(52, 152, 219, ${Math.max(0.4, 1 - i * 0.1)})`,
+              },
+            });
+          }
         }
-      );
-      const data = await response.json();
-      const elements = data.rows[0].elements;
-      const convertedElements = elements.map((el, index) => ({
-        distance: `${el.distance}`,
-        duration: `${Math.floor(el.duration / 3600)} hrs ${Math.floor(
-          (el.duration % 3600) / 60
-        )} min`,
-        polyline: el.polyline,
-        service: connections[index]?.serviceName,
-        serviceType: connections[index]?.serviceType,
-        createdAt: connections[index]?.createdAt,
-        distanceFromCentralHub: connections[index]?.distanceFromCentralHub,
-        image: connections[index]?.image,
-        notes: connections[index]?.notes,
-        location: connections[index]?.coordinates || "N/A",
-      }));
-      console.log(
-        "THE successive OF DeistMatrix CONVERTED :-:",
-        convertedElements
-      );
-      const geojson = buildRoutesGeoJSON(convertedElements);
 
-      if (!map.getSource("routes")) {
-        map.addSource("routes", { type: "geojson", data: geojson });
-
-        map.addLayer({
-          id: "routes-layer",
-          type: "line",
-          source: "routes",
-          layout: { "line-join": "round", "line-cap": "round" },
-          paint: {
-            "line-width": 4,
-            "line-color": ["get", "color"], // use property color 🎨
+        // Add source
+        map.addSource("radius-circles", {
+          type: "geojson",
+          data: {
+            type: "FeatureCollection",
+            features: circleFeatures,
           },
         });
-      } else {
-        map.getSource("routes").setData(geojson);
-      }
-    } catch (error) {
-      console.log("THe ERROR in renderCOllect CT BLCOK : ", error);
-    }
-  }
 
-  function buildRoutesGeoJSON(elements) {
+        // Add line layer for circles
+        map.addLayer({
+          id: "radius-circles-layer",
+          type: "line",
+          source: "radius-circles",
+          filter: ["!=", "type", "label"], // Exclude labels from line layer
+          paint: {
+            "line-color": ["get", "color"],
+            "line-width": 2,
+            "line-dasharray": [2, 2], // Dashed line for better visibility
+          },
+        });
+
+        // Add symbol layer for labels
+        map.addLayer({
+          id: "radius-circles-labels",
+          type: "symbol",
+          source: "radius-circles",
+          filter: ["==", "type", "label"],
+          layout: {
+            "text-field": ["get", "label"],
+            "text-size": 12,
+            "text-anchor": "left",
+            "text-offset": [0.5, 0],
+          },
+          paint: {
+            "text-color": ["get", "color"],
+            "text-halo-color": "white",
+            "text-halo-width": 1,
+          },
+        });
+      } catch (error) {
+        console.log("Error drawing radius circles:", error);
+      }
+    },
+    [
+      map,
+      createCircleCoordinates,
+      calculateDestinationPoint,
+      safeRemoveLayer,
+      safeRemoveSource,
+    ]
+  );
+
+  // Build GeoJSON for routes
+  const buildRoutesGeoJSON = useCallback((elements) => {
     return {
       type: "FeatureCollection",
       features: elements.map((conn, index) => {
@@ -131,29 +300,225 @@ const NetworkMap = () => {
             coordinates: decoded,
           },
           properties: {
-            color: conn.serviceType.colorForMarking, // dynamic color 🎨
+            color: conn.serviceType?.colorForMarking || "#3498db",
             id: index,
           },
         };
       }),
     };
-  }
+  }, []);
 
-  function paintTheMap(elements) {
-    try {
-      for (let conn of elements) {
-        const decodedPolyglon = polyline.decode(conn.polyline);
-        const swappedPolyline = decodedPolyglon.map(([lat, lng]) => [lng, lat]);
+  // Render connections with markers - with map loaded check
+  const renderConnections = useCallback(
+    async (connections) => {
+      if (!map || !olaMaps || !isMapLoaded.current) return;
+
+      try {
+        // Clear existing markers
+        const mapContainer = map.getContainer();
+        const existingMarkers =
+          mapContainer.querySelectorAll(".location-marker");
+        existingMarkers.forEach((marker) => {
+          if (marker.parentNode) {
+            marker.parentNode.removeChild(marker);
+          }
+        });
+
+        // Remove existing routes
+        safeRemoveLayer(map, "routes-layer");
+        safeRemoveSource(map, "routes");
+
+        // Add new markers
+        for (let conn of connections) {
+          const markerElement = createLocationMarkerElement(conn);
+          markerElement.classList.add("location-marker");
+
+          olaMaps
+            .addMarker({
+              element: markerElement,
+              anchor: "center",
+            })
+            .setLngLat([
+              Number(conn.coordinates.longitude),
+              Number(conn.coordinates.latitude),
+            ])
+            .addTo(map);
+        }
+
+        // Create distance matrix request
+        if (connections.length > 0) {
+          const locationString = connections
+            .map(
+              (conn) =>
+                `${conn.coordinates.latitude}%2C${conn.coordinates.longitude}`
+            )
+            .join("%7C");
+
+          console.log("Location string for distance matrix:", locationString);
+
+          const response = await fetch(
+            `https://api.olamaps.io/routing/v1/distanceMatrix?origins=${CENTRAL_HUB.lat}%2C${CENTRAL_HUB.lng}&destinations=${locationString}&api_key=dxEuToWnHB5W4e4lcqiFwu2RwKA64Ixi0BFR73kQ`,
+            {
+              method: "GET",
+              headers: { "X-Request-Id": "XXX" },
+            }
+          );
+
+          const data = await response.json();
+          const elements = data.rows[0].elements;
+          const convertedElements = elements.map((el, index) => ({
+            distance: el.distance,
+            duration: `${Math.floor(el.duration / 3600)} hrs ${Math.floor(
+              (el.duration % 3600) / 60
+            )} min`,
+            polyline: el.polyline,
+            service: connections[index]?.serviceName,
+            serviceType: connections[index]?.serviceType,
+            createdAt: connections[index]?.createdAt,
+            distanceFromCentralHub: connections[index]?.distanceFromCentralHub,
+            image: connections[index]?.image,
+            notes: connections[index]?.notes,
+            location: connections[index]?.coordinates || "N/A",
+          }));
+
+          console.log("Distance Matrix converted:", convertedElements);
+          const geojson = buildRoutesGeoJSON(convertedElements);
+
+          // Add routes source and layer
+          if (!map.getSource("routes")) {
+            map.addSource("routes", {
+              type: "geojson",
+              data: geojson,
+            });
+          } else {
+            map.getSource("routes").setData(geojson);
+          }
+
+          if (!map.getLayer("routes-layer")) {
+            map.addLayer({
+              id: "routes-layer",
+              type: "line",
+              source: "routes",
+              layout: { "line-join": "round", "line-cap": "round" },
+              paint: {
+                "line-width": 4,
+                "line-color": ["get", "color"],
+              },
+            });
+          }
+        }
+
+        // Calculate max distance for radius circles
+        const maxDistance =
+          connections.length > 0
+            ? Math.max(
+                ...connections.map((conn) => conn.distanceFromCentralHub || 0)
+              )
+            : 1000;
+
+        // Draw radius circles (at least up to 500m, or max distance + 100m)
+        const circleMaxDistance = Math.max(
+          500,
+          Math.ceil(maxDistance / 100) * 100 + 100
+        );
+        drawRadiusCircles(circleMaxDistance, 100);
+      } catch (error) {
+        console.log("Error in renderConnections:", error);
       }
-    } catch (error) {
-      console.log("Error While Painting the Map : ", error);
-    }
-  }
+    },
+    [
+      map,
+      olaMaps,
+      createLocationMarkerElement,
+      drawRadiusCircles,
+      buildRoutesGeoJSON,
+      safeRemoveLayer,
+      safeRemoveSource,
+    ]
+  );
 
+  // Initialize map and fetch data
+  useEffect(() => {
+    if (!map || !olaMaps) return;
+
+    // Wait for map to be fully loaded
+    const handleMapLoad = () => {
+      isMapLoaded.current = true;
+
+      // Set up map click handler
+      const handleClick = (e) => {
+        const { lng, lat } = e.lngLat;
+        handleMapClick({ longitude: lng, latitude: lat });
+      };
+
+      map.on("click", handleClick);
+
+      // Fit map to central hub initially
+      map.flyTo({
+        center: [parseFloat(CENTRAL_HUB.lng), parseFloat(CENTRAL_HUB.lat)],
+        zoom: 14,
+        duration: 1000,
+      });
+
+      // Fetch data
+      fetchData();
+
+      // Store cleanup function
+      return () => {
+        cleanupScheduled.current = true;
+        map.off("click", handleClick);
+
+        // Clean up layers
+        safeRemoveLayer(map, "radius-circles-layer");
+        safeRemoveLayer(map, "radius-circles-labels");
+        safeRemoveLayer(map, "routes-layer");
+
+        // Clean up sources
+        safeRemoveSource(map, "radius-circles");
+        safeRemoveSource(map, "routes");
+      };
+    };
+
+    if (map.isStyleLoaded()) {
+      const cleanup = handleMapLoad();
+      return cleanup;
+    } else {
+      const handleStyleLoad = () => {
+        map.off("styledata", handleStyleLoad);
+        const cleanup = handleMapLoad();
+
+        return () => {
+          if (cleanup) cleanup();
+        };
+      };
+
+      map.on("styledata", handleStyleLoad);
+
+      return () => {
+        map.off("styledata", handleStyleLoad);
+        cleanupScheduled.current = true;
+      };
+    }
+  }, [map, olaMaps, safeRemoveLayer, safeRemoveSource]);
+
+  // Update filtered locations when all locations change
   useEffect(() => {
     setFilteredLocations(allLocations);
   }, [allLocations]);
 
+  // Re-render connections when filtered locations change
+  useEffect(() => {
+    if (
+      map &&
+      olaMaps &&
+      isMapLoaded.current &&
+      filteredLocations.length >= 0
+    ) {
+      renderConnections(filteredLocations);
+    }
+  }, [filteredLocations, map, olaMaps, renderConnections]);
+
+  // Fetch data function
   const fetchData = async () => {
     try {
       const [locationsRes, servicesRes, serviceTypesRes] = await Promise.all([
@@ -161,23 +526,26 @@ const NetworkMap = () => {
         axios.get("/api/services"),
         axios.get("/api/service-types"),
       ]);
-      await renderConnections(locationsRes.data);
+
       setAllLocations(locationsRes.data);
       setServices(servicesRes.data);
       setServiceTypes(serviceTypesRes.data);
-    } catch (error) {
-      console.log(
-        "Error WHILE fetch locations,services,services-types : ",
-        error
-      );
 
+      // Render connections after setting state
+      setTimeout(() => {
+        if (map && olaMaps && isMapLoaded.current) {
+          renderConnections(locationsRes.data);
+        }
+      }, 100);
+    } catch (error) {
+      console.log("Error fetching locations, services, service-types:", error);
       setError("Failed to fetch data");
-      console.error("Error fetching data:", error);
     } finally {
       setLoading(false);
     }
   };
 
+  // Handle filters change
   const handleFiltersChange = (filters) => {
     let filtered = [...allLocations];
 
@@ -256,21 +624,39 @@ const NetworkMap = () => {
     setFilteredLocations(filtered);
   };
 
+  // Handle map click to add location
   const handleMapClick = (coordinates) => {
     setClickedCoordinates(coordinates);
     setShowAddModal(true);
   };
 
+  // Handle location created
   const handleLocationCreated = (newLocation) => {
     setAllLocations((prev) => [...prev, newLocation]);
     setSuccess("Location added successfully!");
+
+    // Re-render connections with new location
+    setTimeout(() => {
+      if (map && olaMaps && isMapLoaded.current) {
+        renderConnections([...allLocations, newLocation]);
+      }
+    }, 100);
+
     setTimeout(() => setSuccess(""), 3000);
   };
 
+  // Handle close modal
   const handleCloseModal = () => {
     setShowAddModal(false);
     setClickedCoordinates(null);
   };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      cleanupScheduled.current = true;
+    };
+  }, []);
 
   if (loading) {
     return <div className="loading">Loading network map...</div>;
@@ -282,34 +668,47 @@ const NetworkMap = () => {
         <div className="card-header">
           <h2 className="card-title">Interactive Network Map</h2>
           <div style={{ fontSize: "14px", color: "#666" }}>
-            Click anywhere on the map to add a new location
+            Click anywhere on the map to add a new location. Concentric circles
+            show 100m distance intervals from central hub.
           </div>
         </div>
         {error && <div className="error">{error}</div>}
         {success && <div className="success">{success}</div>}
       </div>
+
+      {/* Render the MapWithSearch component */}
+      <div className="mb-6">
+        <MapWithSearch
+          style={{ width: "100%", height: "500px", borderRadius: "8px" }}
+        />
+      </div>
+
       <NetworkAnalytics
         locations={filteredLocations}
         serviceTypes={serviceTypes}
         services={services}
       />
+
       <AdvancedFilters
         onFiltersChange={handleFiltersChange}
         services={services}
         serviceTypes={serviceTypes}
         locations={filteredLocations}
       />
+
       <NetworkExport
         locations={filteredLocations}
         services={services}
         serviceTypes={serviceTypes}
       />
+
       <AddLocationModal
         isOpen={showAddModal}
         onClose={handleCloseModal}
         coordinates={clickedCoordinates}
         onLocationCreated={handleLocationCreated}
       />
+
       <div className="card">
         <div className="card-header">
           <h3 className="card-title">
