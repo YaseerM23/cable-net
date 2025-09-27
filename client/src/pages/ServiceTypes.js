@@ -1,92 +1,101 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import axios from "axios"
+import { useState, useEffect } from "react";
+import axios from "axios";
+import { DataTable } from "../components/DataTable";
 
 const ServiceTypes = () => {
-  const [serviceTypes, setServiceTypes] = useState([])
-  const [services, setServices] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
-  const [editingServiceType, setEditingServiceType] = useState(null)
+  const [serviceTypes, setServiceTypes] = useState([]);
+  const [services, setServices] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editingServiceType, setEditingServiceType] = useState(null);
   const [formData, setFormData] = useState({
     name: "",
     colorForMarking: "#3498db",
     icon: "",
     service: "",
-  })
-  const [error, setError] = useState("")
-  const [success, setSuccess] = useState("")
+  });
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   useEffect(() => {
-    fetchData()
-  }, [])
+    fetchData();
+  }, []);
 
   const fetchData = async () => {
     try {
       const [serviceTypesRes, servicesRes] = await Promise.all([
         axios.get("/api/service-types"),
         axios.get("/api/services"),
-      ])
-      setServiceTypes(serviceTypesRes.data)
-      setServices(servicesRes.data)
+      ]);
+      setServiceTypes(serviceTypesRes.data);
+      setServices(servicesRes.data);
     } catch (error) {
-      setError("Failed to fetch data")
-      console.error("Error fetching data:", error)
+      setError("Failed to fetch data");
+      console.error("Error fetching data:", error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
-    setError("")
-    setSuccess("")
+    e.preventDefault();
+    setError("");
+    setSuccess("");
 
     try {
       if (editingServiceType) {
-        await axios.put(`/api/service-types/${editingServiceType._id}`, formData)
-        setSuccess("Service type updated successfully")
+        await axios.put(
+          `/api/service-types/${editingServiceType._id}`,
+          formData
+        );
+        setSuccess("Service type updated successfully");
       } else {
-        await axios.post("/api/service-types", formData)
-        setSuccess("Service type created successfully")
+        await axios.post("/api/service-types", formData);
+        setSuccess("Service type created successfully");
       }
 
-      fetchData()
-      resetForm()
+      fetchData();
+      resetForm();
     } catch (error) {
-      setError(error.response?.data?.message || "Operation failed")
+      setError(error.response?.data?.message || "Operation failed");
     }
-  }
+  };
 
   const handleEdit = (serviceType) => {
-    setEditingServiceType(serviceType)
+    setEditingServiceType(serviceType);
     setFormData({
       name: serviceType.name,
       colorForMarking: serviceType.colorForMarking,
       icon: serviceType.icon,
       service: serviceType.service._id,
-    })
-    setShowForm(true)
-  }
+    });
+    setShowForm(true);
+  };
 
   const handleDelete = async (id) => {
     if (window.confirm("Are you sure you want to delete this service type?")) {
       try {
-        await axios.delete(`/api/service-types/${id}`)
-        setSuccess("Service type deleted successfully")
-        fetchData()
+        await axios.delete(`/api/service-types/${id}`);
+        setSuccess("Service type deleted successfully");
+        fetchData();
       } catch (error) {
-        setError("Failed to delete service type")
+        setError("Failed to delete service type");
       }
     }
-  }
+  };
 
   const resetForm = () => {
-    setFormData({ name: "", colorForMarking: "#3498db", icon: "", service: "" })
-    setEditingServiceType(null)
-    setShowForm(false)
-  }
+    setFormData({
+      name: "",
+      colorForMarking: "#3498db",
+      icon: "",
+      service: "",
+    });
+    setEditingServiceType(null);
+    setShowForm(false);
+  };
 
   const iconOptions = [
     "📡",
@@ -109,18 +118,24 @@ const ServiceTypes = () => {
     "🏨",
     "🏩",
     "🏰",
-  ]
+  ];
 
   if (loading) {
-    return <div className="loading">Loading service types...</div>
+    return <div className="loading">Loading service types...</div>;
   }
 
   return (
-    <div>
-      <div className="card">
-        <div className="card-header">
-          <h2 className="card-title">Service Type Management</h2>
-          <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
+    <div className="min-h-screen bg-gray-100 text-gray-900 p-4 sm:p-6 lg:p-8">
+      <div className="bg-white shadow-lg rounded-2xl p-6 lg:p-8">
+        {/* Header and Search */}
+        <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+          <h2 className="text-3xl font-bold text-gray-800 tracking-wide">
+            Service Type Management
+          </h2>
+          <button
+            className="btn btn-primary"
+            onClick={() => setShowForm(!showForm)}
+          >
             {showForm ? "Cancel" : "Add New Service Type"}
           </button>
         </div>
@@ -136,7 +151,9 @@ const ServiceTypes = () => {
                 type="text"
                 className="form-input"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
                 placeholder="e.g., AC Node, Injector, Tenda, Railwire"
                 required
               />
@@ -147,7 +164,9 @@ const ServiceTypes = () => {
               <select
                 className="form-select"
                 value={formData.service}
-                onChange={(e) => setFormData({ ...formData, service: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, service: e.target.value })
+                }
                 required
               >
                 <option value="">Select a service</option>
@@ -161,18 +180,35 @@ const ServiceTypes = () => {
 
             <div className="form-group">
               <label className="form-label">Color for Marking</label>
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <div
+                style={{ display: "flex", alignItems: "center", gap: "10px" }}
+              >
                 <input
                   type="color"
                   value={formData.colorForMarking}
-                  onChange={(e) => setFormData({ ...formData, colorForMarking: e.target.value })}
-                  style={{ width: "50px", height: "40px", border: "none", borderRadius: "4px" }}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      colorForMarking: e.target.value,
+                    })
+                  }
+                  style={{
+                    width: "50px",
+                    height: "40px",
+                    border: "none",
+                    borderRadius: "4px",
+                  }}
                 />
                 <input
                   type="text"
                   className="form-input"
                   value={formData.colorForMarking}
-                  onChange={(e) => setFormData({ ...formData, colorForMarking: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      colorForMarking: e.target.value,
+                    })
+                  }
                   placeholder="#3498db"
                   pattern="^#[0-9A-Fa-f]{6}$"
                   style={{ flex: 1 }}
@@ -183,7 +219,12 @@ const ServiceTypes = () => {
             <div className="form-group">
               <label className="form-label">Icon</label>
               <div
-                style={{ display: "grid", gridTemplateColumns: "repeat(10, 1fr)", gap: "8px", marginBottom: "10px" }}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(10, 1fr)",
+                  gap: "8px",
+                  marginBottom: "10px",
+                }}
               >
                 {iconOptions.map((icon) => (
                   <button
@@ -192,7 +233,10 @@ const ServiceTypes = () => {
                     onClick={() => setFormData({ ...formData, icon })}
                     style={{
                       padding: "8px",
-                      border: formData.icon === icon ? "2px solid #3498db" : "1px solid #ddd",
+                      border:
+                        formData.icon === icon
+                          ? "2px solid #3498db"
+                          : "1px solid #ddd",
                       borderRadius: "4px",
                       background: formData.icon === icon ? "#e3f2fd" : "white",
                       cursor: "pointer",
@@ -207,7 +251,9 @@ const ServiceTypes = () => {
                 type="text"
                 className="form-input"
                 value={formData.icon}
-                onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, icon: e.target.value })
+                }
                 placeholder="Select an icon above or enter custom"
                 required
               />
@@ -215,78 +261,72 @@ const ServiceTypes = () => {
 
             <div style={{ display: "flex", gap: "10px" }}>
               <button type="submit" className="btn btn-success">
-                {editingServiceType ? "Update Service Type" : "Create Service Type"}
+                {editingServiceType
+                  ? "Update Service Type"
+                  : "Create Service Type"}
               </button>
-              <button type="button" className="btn btn-secondary" onClick={resetForm}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={resetForm}
+              >
                 Cancel
               </button>
             </div>
           </form>
         )}
 
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Service</th>
-              <th>Color</th>
-              <th>Icon</th>
-              <th>Created At</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {serviceTypes.map((serviceType) => (
-              <tr key={serviceType._id}>
-                <td>{serviceType.name}</td>
-                <td>{serviceType.service?.name || "N/A"}</td>
-                <td>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <div
-                      style={{
-                        width: "20px",
-                        height: "20px",
-                        backgroundColor: serviceType.colorForMarking,
-                        borderRadius: "4px",
-                        border: "1px solid #ddd",
-                      }}
-                    />
-                    {serviceType.colorForMarking}
-                  </div>
-                </td>
-                <td style={{ fontSize: "20px" }}>{serviceType.icon}</td>
-                <td>{new Date(serviceType.createdAt).toLocaleDateString()}</td>
-                <td>
-                  <div style={{ display: "flex", gap: "8px" }}>
-                    <button
-                      className="btn btn-primary"
-                      onClick={() => handleEdit(serviceType)}
-                      style={{ padding: "6px 12px", fontSize: "12px" }}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      className="btn btn-danger"
-                      onClick={() => handleDelete(serviceType._id)}
-                      style={{ padding: "6px 12px", fontSize: "12px" }}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <DataTable
+          data={serviceTypes}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          columns={[
+            { key: "name", header: "Name" },
+            {
+              key: "service",
+              header: "Service",
+              render: (s) => s.service?.name || "N/A",
+            },
+            {
+              key: "colorForMarking",
+              header: "Color",
+              render: (s) => (
+                <div className="flex items-center gap-2">
+                  <div
+                    style={{
+                      width: "20px",
+                      height: "20px",
+                      backgroundColor: s.colorForMarking,
+                      borderRadius: "4px",
+                      border: "1px solid #ddd",
+                    }}
+                  />
+                  {s.colorForMarking}
+                </div>
+              ),
+            },
+            {
+              key: "icon",
+              header: "Icon",
+              render: (s) => <span className="text-lg">{s.icon}</span>,
+            },
+            {
+              key: "createdAt",
+              header: "Created At",
+              render: (s) => new Date(s.createdAt).toLocaleDateString(),
+            },
+          ]}
+        />
 
         {serviceTypes.length === 0 && (
           <div style={{ textAlign: "center", padding: "40px", color: "#666" }}>
-            No service types found. Create your first service type to get started.
+            No service types found. Create your first service type to get
+            started.
           </div>
         )}
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default ServiceTypes
+export default ServiceTypes;
