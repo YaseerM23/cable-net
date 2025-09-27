@@ -15,7 +15,6 @@ import Services from "./pages/Services";
 import ServiceTypes from "./pages/ServiceTypes";
 import "./App.css";
 import MapProvider from "./components/Map/MapProvider";
-import { SearchBox } from "./components/Map/AutoComplete";
 
 function App() {
   return (
@@ -40,17 +39,7 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Layout>
-                    <MapProvider
-                      overlay={
-                        <>
-                          <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-20 w-full max-w-lg px-4">
-                            <div className="bg-white shadow-lg rounded-xl border border-gray-200 overflow-hidden">
-                              <SearchBox />
-                            </div>
-                          </div>
-                        </>
-                      }
-                    >
+                    <MapProvider>
                       <NetworkMap />
                     </MapProvider>
                   </Layout>
