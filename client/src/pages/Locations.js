@@ -1,3 +1,4 @@
+// components/Locations.js
 "use client";
 
 import { useState, useEffect } from "react";
@@ -11,22 +12,26 @@ const Locations = () => {
   const [filteredServiceTypes, setFilteredServiceTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const API_BASE_URL =
+    process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
   const [editingLocation, setEditingLocation] = useState(null);
   const [formData, setFormData] = useState({
     serviceName: "",
     serviceType: "",
-    image: "",
+    image: "", // Will store relative path or empty string
     notes: "",
     coordinates: {
       latitude: "",
       longitude: "",
     },
   });
+  const [imageFile, setImageFile] = useState(null); // For new upload
+  const [imagePreview, setImagePreview] = useState(null); // Preview of uploaded image
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10); // Number of items per page
+  const [itemsPerPage] = useState(10);
 
   useEffect(() => {
     fetchData();
@@ -50,7 +55,19 @@ const Locations = () => {
         axios.get("/api/services"),
         axios.get("/api/service-types"),
       ]);
-      setLocations(locationsRes.data);
+
+      // Fix image URLs for all locations
+      const fixedLocations = locationsRes.data.map((loc) => {
+        if (loc.image && loc.image.startsWith("/uploads")) {
+          return {
+            ...loc,
+            image: `${API_BASE_URL}${loc.image}`,
+          };
+        }
+        return loc;
+      });
+
+      setLocations(fixedLocations);
       setServices(servicesRes.data);
       setServiceTypes(serviceTypesRes.data);
     } catch (error) {
@@ -84,19 +101,66 @@ const Locations = () => {
     }
 
     const locationData = {
-      ...formData,
+      serviceName: formData.serviceName,
+      serviceType: formData.serviceType,
+      notes: formData.notes,
       coordinates: { latitude: lat, longitude: lng },
     };
 
     try {
+      let response;
+
       if (editingLocation) {
-        await axios.put(`/api/locations/${editingLocation._id}`, locationData);
-        setSuccess("Location updated successfully");
+        // If updating and no new image → send JSON
+        if (!imageFile) {
+          response = await axios.put(
+            `/api/locations/${editingLocation._id}`,
+            locationData
+          );
+        } else {
+          // If updating AND uploading new image → send FormData
+          const formDataToSend = new FormData();
+          formDataToSend.append("serviceName", formData.serviceName);
+          formDataToSend.append("serviceType", formData.serviceType);
+          formDataToSend.append("notes", formData.notes);
+          formDataToSend.append("latitude", lat.toString());
+          formDataToSend.append("longitude", lng.toString());
+          formDataToSend.append("image", imageFile);
+
+          response = await axios.put(
+            `/api/locations/${editingLocation._id}`,
+            formDataToSend,
+            {
+              headers: {
+                "Content-Type": "multipart/form-data",
+              },
+            }
+          );
+        }
       } else {
-        await axios.post("/api/locations", locationData);
-        setSuccess("Location created successfully");
+        // Creating new location
+        const formDataToSend = new FormData();
+        formDataToSend.append("serviceName", formData.serviceName);
+        formDataToSend.append("serviceType", formData.serviceType);
+        formDataToSend.append("notes", formData.notes);
+        formDataToSend.append("latitude", lat.toString());
+        formDataToSend.append("longitude", lng.toString());
+        if (imageFile) {
+          formDataToSend.append("image", imageFile);
+        }
+
+        response = await axios.post("/api/locations", formDataToSend, {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        });
       }
 
+      setSuccess(
+        editingLocation
+          ? "Location updated successfully"
+          : "Location created successfully"
+      );
       fetchData();
       resetForm();
     } catch (error) {
@@ -109,13 +173,15 @@ const Locations = () => {
     setFormData({
       serviceName: location.serviceName?._id || "",
       serviceType: location.serviceType?._id || "",
-      image: location.image || "",
+      image: location.image || "", // Store full URL or empty
       notes: location.notes || "",
       coordinates: {
         latitude: location.coordinates.latitude.toString(),
         longitude: location.coordinates.longitude.toString(),
       },
     });
+    setImageFile(null);
+    setImagePreview(null);
     setShowForm(true);
   };
 
@@ -139,6 +205,8 @@ const Locations = () => {
       notes: "",
       coordinates: { latitude: "", longitude: "" },
     });
+    setImageFile(null);
+    setImagePreview(null);
     setEditingLocation(null);
     setShowForm(false);
   };
@@ -165,6 +233,30 @@ const Locations = () => {
     } else {
       setError("Geolocation is not supported by this browser.");
     }
+  };
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        setError("Image size must be less than 5MB");
+        return;
+      }
+      if (!file.type.startsWith("image/")) {
+        setError("Only image files are allowed");
+        return;
+      }
+      setImageFile(file);
+      setImagePreview(URL.createObjectURL(file));
+      setError("");
+    }
+  };
+
+  const removeImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+    setFormData({ ...formData, image: "" }); // Clear image field
+    setError("");
   };
 
   // Pagination & Search Logic
@@ -259,7 +351,7 @@ const Locations = () => {
                 value={searchTerm}
                 onChange={(e) => {
                   setSearchTerm(e.target.value);
-                  setCurrentPage(1); // Reset to first page on search
+                  setCurrentPage(1);
                 }}
               />
               <svg
@@ -404,19 +496,50 @@ const Locations = () => {
               </button>
             </div>
 
+            {/* Image Upload Section */}
             <div>
               <label className="block text-sm font-medium mb-2 text-gray-700">
-                Image URL (Optional)
+                Upload Image (Optional, max 5MB)
               </label>
               <input
-                type="url"
-                className="w-full border-gray-300 rounded-lg px-4 py-2 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-colors"
-                value={formData.image}
-                onChange={(e) =>
-                  setFormData({ ...formData, image: e.target.value })
-                }
-                placeholder="https://example.com/location-image.jpg"
+                type="file"
+                accept="image/*"
+                onChange={handleImageChange}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
               />
+              {imagePreview && (
+                <div className="mt-3 flex items-center gap-4">
+                  <img
+                    src={imagePreview}
+                    alt="Preview"
+                    className="h-20 w-20 object-cover rounded border border-gray-300"
+                  />
+                  <button
+                    type="button"
+                    onClick={removeImage}
+                    className="px-3 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
+                  >
+                    Remove Image
+                  </button>
+                </div>
+              )}
+              {/* Show current image if exists and no new upload */}
+              {!imagePreview && formData.image && (
+                <div className="mt-3 flex items-center gap-4">
+                  <img
+                    src={formData.image}
+                    alt="Current"
+                    className="h-20 w-20 object-cover rounded border border-gray-300"
+                  />
+                  <button
+                    type="button"
+                    onClick={removeImage}
+                    className="px-3 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
+                  >
+                    Remove Image
+                  </button>
+                </div>
+              )}
             </div>
 
             <div>
@@ -494,6 +617,21 @@ const Locations = () => {
               header: "Created At",
               className: "hidden lg:table-cell",
               render: (l) => new Date(l.createdAt).toLocaleDateString(),
+            },
+            {
+              key: "image",
+              header: "Image",
+              className: "hidden md:table-cell",
+              render: (l) =>
+                l.image ? (
+                  <img
+                    src={l.image}
+                    alt="Location"
+                    className="h-10 w-10 object-cover rounded border"
+                  />
+                ) : (
+                  <span className="text-gray-500">-</span>
+                ),
             },
           ]}
         />

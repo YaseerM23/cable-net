@@ -14,6 +14,8 @@ import polyline from "polyline";
 import MapWithSearch from "../components/Map/MapWithSearch";
 import { SearchBox } from "../components/Map/AutoComplete";
 import MapContainer from "../components/Map/MapContainer";
+import MapServiceTypeFilter from "../components/Map/MapServiceTypeFilter"; // 👈 NEW IMPORT
+import { useMemo } from "react";
 
 const NetworkMap = () => {
   const [allLocations, setAllLocations] = useState([]);
@@ -26,6 +28,8 @@ const NetworkMap = () => {
   const [clickedCoordinates, setClickedCoordinates] = useState(null);
   const [success, setSuccess] = useState("");
   const [hoveredLocation, setHoveredLocation] = useState(null);
+  const [mapServiceTypeFilter, setMapServiceTypeFilter] = useState(""); // 👈 NEW STATE
+
   const { map, olaMaps } = useMap();
   const isMapLoaded = useRef(false);
   const cleanupScheduled = useRef(false);
@@ -90,6 +94,13 @@ const NetworkMap = () => {
 
     return el;
   }, []);
+
+  const locationsForMap = useMemo(() => {
+    if (!mapServiceTypeFilter) return filteredLocations;
+    return filteredLocations.filter(
+      (loc) => loc.serviceType?._id === mapServiceTypeFilter
+    );
+  }, [filteredLocations, mapServiceTypeFilter]);
 
   // Calculate destination point given distance and bearing from a start point
   const calculateDestinationPoint = useCallback(
@@ -518,16 +529,29 @@ const NetworkMap = () => {
   }, [allLocations]);
 
   // Re-render connections when filtered locations change
+  // useEffect(() => {
+  //   if (
+  //     map &&
+  //     olaMaps &&
+  //     isMapLoaded.current &&
+  //     filteredLocations.length >= 0
+  //   ) {
+  //     renderConnections(filteredLocations);
+  //   }
+  // }, [filteredLocations, map, olaMaps, renderConnections]);
+
   useEffect(() => {
-    if (
-      map &&
-      olaMaps &&
-      isMapLoaded.current &&
-      filteredLocations.length >= 0
-    ) {
-      renderConnections(filteredLocations);
+    if (map && olaMaps && isMapLoaded.current && locationsForMap.length >= 0) {
+      renderConnections(locationsForMap);
     }
-  }, [filteredLocations, map, olaMaps, renderConnections]);
+  }, [locationsForMap, map, olaMaps, renderConnections]);
+
+  const handleMapServiceTypeFilterChange = (serviceTypeId) => {
+    setMapServiceTypeFilter(serviceTypeId);
+  };
+
+  const API_BASE_URL =
+    process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
 
   // Fetch data function
   const fetchData = async () => {
@@ -538,14 +562,25 @@ const NetworkMap = () => {
         axios.get("/api/service-types"),
       ]);
 
-      setAllLocations(locationsRes.data);
+      // Fix image URLs for all locations
+      const fixedLocations = locationsRes.data.map((loc) => {
+        if (loc.image && loc.image.startsWith("/uploads")) {
+          return {
+            ...loc,
+            image: `${API_BASE_URL}${loc.image}`,
+          };
+        }
+        return loc;
+      });
+
+      setAllLocations(fixedLocations);
       setServices(servicesRes.data);
       setServiceTypes(serviceTypesRes.data);
 
       // Render connections after setting state
       setTimeout(() => {
         if (map && olaMaps && isMapLoaded.current) {
-          renderConnections(locationsRes.data);
+          renderConnections(fixedLocations);
         }
       }, 100);
     } catch (error) {
@@ -555,7 +590,6 @@ const NetworkMap = () => {
       setLoading(false);
     }
   };
-
   // Handle filters change
   const handleFiltersChange = (filters) => {
     let filtered = [...allLocations];
@@ -643,6 +677,11 @@ const NetworkMap = () => {
 
   // Handle location created
   const handleLocationCreated = (newLocation) => {
+    // Fix image URL if it exists and is relative
+    if (newLocation.image && newLocation.image.startsWith("/uploads")) {
+      newLocation.image = `${API_BASE_URL}${newLocation.image}`;
+    }
+
     setAllLocations((prev) => [...prev, newLocation]);
     setSuccess("Location added successfully!");
 
@@ -676,16 +715,14 @@ const NetworkMap = () => {
   return (
     <div>
       <div className="relative">
-        <MapContainer className="w-full h-screen" />
+        <MapContainer className="w-full h-[600px]" />
 
         {/* overlays */}
         <div className="absolute top-4 left-0 w-full flex justify-center gap-4 px-4">
           <SearchBox />
-          <AdvancedFilters
-            onFiltersChange={handleFiltersChange}
-            services={services}
+          <MapServiceTypeFilter
             serviceTypes={serviceTypes}
-            locations={filteredLocations}
+            onServiceTypeFilterChange={handleMapServiceTypeFilterChange}
           />
         </div>
       </div>
@@ -699,6 +736,12 @@ const NetworkMap = () => {
         locations={filteredLocations}
         services={services}
         serviceTypes={serviceTypes}
+      />
+      <AdvancedFilters
+        onFiltersChange={handleFiltersChange}
+        services={services}
+        serviceTypes={serviceTypes}
+        locations={filteredLocations}
       />
       <AddLocationModal
         isOpen={showAddModal}
