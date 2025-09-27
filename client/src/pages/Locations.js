@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import axios from "axios";
+import { DataTable } from "../components/DataTable";
 
 const Locations = () => {
   const [locations, setLocations] = useState([]);
@@ -452,93 +453,50 @@ const Locations = () => {
         )}
 
         {/* Table */}
-        <div className="overflow-x-auto relative shadow-lg rounded-xl border border-gray-200">
-          <table className="w-full text-sm text-gray-700">
-            <thead className="text-xs uppercase bg-gray-100 text-gray-500">
-              <tr>
-                <th scope="col" className="p-4 text-left">
-                  Service
-                </th>
-                <th scope="col" className="p-4 text-left">
-                  Type
-                </th>
-                <th scope="col" className="p-4 text-left">
-                  Coordinates
-                </th>
-                <th scope="col" className="p-4 text-left hidden md:table-cell">
-                  Notes
-                </th>
-                <th scope="col" className="p-4 text-left hidden lg:table-cell">
-                  Created At
-                </th>
-                <th scope="col" className="p-4 text-left">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {currentLocations.map((location) => (
-                <tr
-                  key={location._id}
-                  className="bg-white border-b border-gray-200 hover:bg-gray-50 transition-colors"
-                >
-                  <td className="p-4 font-medium whitespace-nowrap">
-                    {location.serviceName?.name || "N/A"}
-                  </td>
-                  <td className="p-4 flex items-center gap-2">
-                    <span className="text-xl">
-                      {location.serviceType?.icon}
-                    </span>
-                    <span>{location.serviceType?.name || "N/A"}</span>
-                  </td>
-                  <td className="p-4 text-xs">
-                    <div>Lat: {location.coordinates.latitude.toFixed(6)}</div>
-                    <div>Lng: {location.coordinates.longitude.toFixed(6)}</div>
-                  </td>
-                  <td className="p-4 max-w-[200px] truncate hidden md:table-cell">
-                    {location.notes || "No notes"}
-                  </td>
-                  <td className="p-4 hidden lg:table-cell">
-                    {new Date(location.createdAt).toLocaleDateString()}
-                  </td>
-                  <td className="p-4 flex gap-2 flex-wrap">
-                    <button
-                      className="px-3 py-1 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors"
-                      onClick={() => handleEdit(location)}
-                    >
-                      <svg
-                        className="w-4 h-4"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828zM3 5h2v12H3V5zm4 10h10v2H7v-2z"></path>
-                      </svg>
-                    </button>
-                    <button
-                      className="px-3 py-1 bg-red-600 text-white text-xs rounded-lg hover:bg-red-700 transition-colors"
-                      onClick={() => handleDelete(location._id)}
-                    >
-                      <svg
-                        className="w-4 h-4"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm6 0a1 1 0 012 0v6a1 1 0 11-2 0V8z"
-                          clipRule="evenodd"
-                        ></path>
-                      </svg>
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
+        <DataTable
+          data={currentLocations}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          columns={[
+            {
+              key: "serviceName",
+              header: "Service",
+              render: (l) => l.serviceName?.name || "N/A",
+            },
+            {
+              key: "serviceType",
+              header: "Type",
+              render: (l) => (
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">{l.serviceType?.icon}</span>
+                  <span>{l.serviceType?.name || "N/A"}</span>
+                </div>
+              ),
+            },
+            {
+              key: "coordinates",
+              header: "Coordinates",
+              render: (l) => (
+                <div className="text-xs">
+                  <div>Lat: {l.coordinates.latitude.toFixed(6)}</div>
+                  <div>Lng: {l.coordinates.longitude.toFixed(6)}</div>
+                </div>
+              ),
+            },
+            {
+              key: "notes",
+              header: "Notes",
+              className: "hidden md:table-cell max-w-[200px] truncate",
+              render: (l) => l.notes || "No notes",
+            },
+            {
+              key: "createdAt",
+              header: "Created At",
+              className: "hidden lg:table-cell",
+              render: (l) => new Date(l.createdAt).toLocaleDateString(),
+            },
+          ]}
+        />
         {currentLocations.length === 0 && (
           <div className="text-center text-gray-500 py-8">
             No locations match your search or exist.
