@@ -6,9 +6,14 @@ import AddLocationModal from "../components/AddLocationModal";
 import NetworkAnalytics from "../components/NetworkAnalytics";
 import AdvancedFilters from "../components/AdvancedFilters";
 import NetworkExport from "../components/NetworkExport";
-import { CENTRAL_HUB, useMap } from "../components/Map/MapProvider";
+import MapProvider, {
+  CENTRAL_HUB,
+  useMap,
+} from "../components/Map/MapProvider";
 import polyline from "polyline";
 import MapWithSearch from "../components/Map/MapWithSearch";
+import { SearchBox } from "../components/Map/AutoComplete";
+import MapContainer from "../components/Map/MapContainer";
 
 const NetworkMap = () => {
   const [allLocations, setAllLocations] = useState([]);
@@ -436,10 +441,16 @@ const NetworkMap = () => {
       safeRemoveSource,
     ]
   );
+  useEffect(() => {
+    if (map || olaMaps) {
+      console.log("Thiz is map Val in NetworkMap : ", map, olaMaps);
+    }
+  }, [map, olaMaps]);
 
   // Initialize map and fetch data
   useEffect(() => {
     if (!map || !olaMaps) return;
+    console.log("Thiz is map Val in NetworkMap : ", map, olaMaps);
 
     // Wait for map to be fully loaded
     const handleMapLoad = () => {
@@ -664,36 +675,24 @@ const NetworkMap = () => {
 
   return (
     <div>
-      <div className="card">
-        <div className="card-header">
-          <h2 className="card-title">Interactive Network Map</h2>
-          <div style={{ fontSize: "14px", color: "#666" }}>
-            Click anywhere on the map to add a new location. Concentric circles
-            show 100m distance intervals from central hub.
-          </div>
+      <div className="relative">
+        <MapContainer className="w-full h-[600px]" />
+
+        {/* overlays */}
+        <div className="absolute top-4 left-0 w-full flex justify-center gap-4 px-4">
+          <SearchBox />
+          <AdvancedFilters
+            onFiltersChange={handleFiltersChange}
+            services={services}
+            serviceTypes={serviceTypes}
+            locations={filteredLocations}
+          />
         </div>
-        {error && <div className="error">{error}</div>}
-        {success && <div className="success">{success}</div>}
       </div>
-
-      {/* Render the MapWithSearch component */}
-      <div className="mb-6">
-        <MapWithSearch
-          style={{ width: "100%", height: "500px", borderRadius: "8px" }}
-        />
-      </div>
-
       <NetworkAnalytics
         locations={filteredLocations}
         serviceTypes={serviceTypes}
         services={services}
-      />
-
-      <AdvancedFilters
-        onFiltersChange={handleFiltersChange}
-        services={services}
-        serviceTypes={serviceTypes}
-        locations={filteredLocations}
       />
 
       <NetworkExport
@@ -701,14 +700,12 @@ const NetworkMap = () => {
         services={services}
         serviceTypes={serviceTypes}
       />
-
       <AddLocationModal
         isOpen={showAddModal}
         onClose={handleCloseModal}
         coordinates={clickedCoordinates}
         onLocationCreated={handleLocationCreated}
       />
-
       <div className="card">
         <div className="card-header">
           <h3 className="card-title">
