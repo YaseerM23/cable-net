@@ -669,14 +669,14 @@ const NetworkMap = () => {
     };
   }, []);
 
-  if (loading) {
-    return <div className="loading">Loading network map...</div>;
-  }
+  // if (loading) {
+  //   return <div className="loading">Loading network map...</div>;
+  // }
 
   return (
     <div>
       <div className="relative">
-        <MapContainer className="w-full h-[600px]" />
+        <MapContainer className="w-full h-screen" />
 
         {/* overlays */}
         <div className="absolute top-4 left-0 w-full flex justify-center gap-4 px-4">

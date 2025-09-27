@@ -15,6 +15,7 @@ import Services from "./pages/Services";
 import ServiceTypes from "./pages/ServiceTypes";
 import "./App.css";
 import MapProvider from "./components/Map/MapProvider";
+import Layout2 from "./components/Layout2";
 
 function App() {
   return (
