@@ -196,7 +196,7 @@ const Layout = ({ children }) => {
         <header className="hidden lg:block bg-white shadow-sm px-6 py-4">
           <div className="flex items-center justify-between">
             <h1 className="text-xl font-semibold text-gray-800">
-              Cable Network Management Dashboard
+              Silver Star Network Management - Developed by SoloCompilers
             </h1>
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}

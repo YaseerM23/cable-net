@@ -116,7 +116,8 @@ app.get("/api/auth/verify", authenticateToken, (req, res) => {
 // Protected route example
 app.get("/api/dashboard", authenticateToken, (req, res) => {
   res.json({
-    message: "Welcome to Cable Network Management Dashboard",
+    message:
+      "Welcome to Silver Star Network Management - Developed by SoloCompilers",
     user: req.user,
   });
 });
