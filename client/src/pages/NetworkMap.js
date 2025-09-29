@@ -591,10 +591,11 @@ const NetworkMap = () => {
     }
   };
   // Handle filters change
+  // Handle filters change
   const handleFiltersChange = (filters) => {
     let filtered = [...allLocations];
 
-    // Apply search filter
+    // 🔍 Apply search filter
     if (filters.searchTerm) {
       const searchTerm = filters.searchTerm.toLowerCase();
       filtered = filtered.filter(
@@ -607,64 +608,70 @@ const NetworkMap = () => {
       );
     }
 
-    // Apply service filter
-    if (filters.service) {
-      filtered = filtered.filter(
-        (location) => location.serviceName._id === filters.service
+    // 🛠 Apply service filter (multi-select)
+    if (filters.service.length > 0) {
+      filtered = filtered.filter((location) =>
+        filters.service.includes(location.serviceName._id)
       );
     }
 
-    // Apply service type filter
-    if (filters.serviceType) {
-      filtered = filtered.filter(
-        (location) => location.serviceType._id === filters.serviceType
+    // 🛠 Apply service type filter (multi-select)
+    if (filters.serviceType.length > 0) {
+      filtered = filtered.filter((location) =>
+        filters.serviceType.includes(location.serviceType._id)
       );
     }
 
-    // Apply distance range filter
-    if (filters.distanceRange) {
-      const [min, max] = filters.distanceRange.includes("+")
-        ? [
-            Number.parseInt(filters.distanceRange.replace("+", "")),
-            Number.POSITIVE_INFINITY,
-          ]
-        : filters.distanceRange.split("-").map(Number);
-
+    // 📏 Apply distance range filter (multi-select)
+    if (filters.distanceRange.length > 0) {
       filtered = filtered.filter((location) => {
         const distance = location.distanceFromCentralHub;
-        return distance >= min && distance < max;
+
+        return filters.distanceRange.some((range) => {
+          if (range.includes("+")) {
+            const min = Number.parseInt(range.replace("+", ""));
+            return distance >= min;
+          } else {
+            const [min, max] = range.split("-").map(Number);
+            return distance >= min && distance < max;
+          }
+        });
       });
     }
 
-    // Apply sorting
-    filtered.sort((a, b) => {
-      let aValue, bValue;
+    // 🔃 Apply sorting (can select multiple, apply in order)
+    if (filters.sortBy.length > 0) {
+      filters.sortBy.forEach((sortKey) => {
+        filtered.sort((a, b) => {
+          let aValue, bValue;
 
-      switch (filters.sortBy) {
-        case "name":
-          aValue = a.serviceName?.name || "";
-          bValue = b.serviceName?.name || "";
-          break;
-        case "type":
-          aValue = a.serviceType?.name || "";
-          bValue = b.serviceType?.name || "";
-          break;
-        case "created":
-          aValue = new Date(a.createdAt);
-          bValue = new Date(b.createdAt);
-          break;
-        case "distance":
-        default:
-          aValue = a.distanceFromCentralHub;
-          bValue = b.distanceFromCentralHub;
-          break;
-      }
+          switch (sortKey) {
+            case "name":
+              aValue = a.serviceName?.name || "";
+              bValue = b.serviceName?.name || "";
+              break;
+            case "type":
+              aValue = a.serviceType?.name || "";
+              bValue = b.serviceType?.name || "";
+              break;
+            case "created":
+              aValue = new Date(a.createdAt);
+              bValue = new Date(b.createdAt);
+              break;
+            case "distance":
+            default:
+              aValue = a.distanceFromCentralHub;
+              bValue = b.distanceFromCentralHub;
+              break;
+          }
 
-      if (filters.sortOrder === "desc") {
-        return aValue < bValue ? 1 : -1;
-      }
-      return aValue > bValue ? 1 : -1;
-    });
+          if (filters.sortOrder.includes("desc")) {
+            return aValue < bValue ? 1 : -1;
+          }
+          return aValue > bValue ? 1 : -1;
+        });
+      });
+    }
 
     setFilteredLocations(filtered);
   };
@@ -718,12 +725,20 @@ const NetworkMap = () => {
         <MapContainer className="w-full h-[600px]" />
 
         {/* overlays */}
-        <div className="absolute top-4 left-0 w-full flex justify-center gap-4 px-4">
+        <div className="absolute top-4 left-0 w-[250px] px-4 flex justify-between">
+          {/* Advanced Filters on left */}
+          <div className="flex items-start">
+            <AdvancedFilters
+              onFiltersChange={handleFiltersChange}
+              services={services}
+              serviceTypes={serviceTypes}
+              locations={filteredLocations}
+            />
+          </div>
+        </div>
+        {/* SearchBox centered absolutely */}
+        <div className="absolute top-2 left-1/2 -translate-x-1/2">
           <SearchBox />
-          <MapServiceTypeFilter
-            serviceTypes={serviceTypes}
-            onServiceTypeFilterChange={handleMapServiceTypeFilterChange}
-          />
         </div>
       </div>
       <NetworkAnalytics
