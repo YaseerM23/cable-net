@@ -11,10 +11,8 @@ import MapProvider, {
   useMap,
 } from "../components/Map/MapProvider";
 import polyline from "polyline";
-import MapWithSearch from "../components/Map/MapWithSearch";
 import { SearchBox } from "../components/Map/AutoComplete";
 import MapContainer from "../components/Map/MapContainer";
-import MapServiceTypeFilter from "../components/Map/MapServiceTypeFilter"; // 👈 NEW IMPORT
 import { useMemo } from "react";
 
 const NetworkMap = () => {
@@ -28,29 +26,25 @@ const NetworkMap = () => {
   const [clickedCoordinates, setClickedCoordinates] = useState(null);
   const [success, setSuccess] = useState("");
   const [hoveredLocation, setHoveredLocation] = useState(null);
-  const [mapServiceTypeFilter, setMapServiceTypeFilter] = useState(""); // 👈 NEW STATE
+  const [mapServiceTypeFilter, setMapServiceTypeFilter] = useState("");
+  const [showRoutes, setShowRoutes] = useState(true); // 👈 Route visibility state
 
   const { map, olaMaps } = useMap();
   const isMapLoaded = useRef(false);
   const cleanupScheduled = useRef(false);
 
-  // Earth's radius in meters
   const EARTH_RADIUS = 6378137;
 
-  // Create location marker with hover functionality
   const createLocationMarkerElement = useCallback((location) => {
-    // Create container
     const el = document.createElement("div");
     el.className =
       "w-10 h-10 flex items-center justify-center rounded-full shadow-lg border border-gray-300 bg-white hover:scale-110 transition-transform duration-200 cursor-pointer";
 
-    // Add icon inside
     const span = document.createElement("span");
     span.className = "text-xl";
     span.innerText = location.serviceType?.icon || "📍";
     el.appendChild(span);
 
-    // Add hover effect for showing location info
     const popupDiv = document.createElement("div");
     popupDiv.className =
       "location-popup hidden absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 bg-white p-3 rounded shadow-lg border z-10 w-64";
@@ -80,13 +74,11 @@ const NetworkMap = () => {
 
     el.appendChild(popupDiv);
 
-    // Show popup on mouseenter
     el.addEventListener("mouseenter", () => {
       popupDiv.classList.remove("hidden");
       setHoveredLocation(location);
     });
 
-    // Hide popup on mouseleave
     el.addEventListener("mouseleave", () => {
       popupDiv.classList.add("hidden");
       setHoveredLocation(null);
@@ -102,15 +94,12 @@ const NetworkMap = () => {
     );
   }, [filteredLocations, mapServiceTypeFilter]);
 
-  // Calculate destination point given distance and bearing from a start point
   const calculateDestinationPoint = useCallback(
     (lat, lng, distance, bearing) => {
-      // Convert degrees to radians
       const latRad = (lat * Math.PI) / 180;
       const lngRad = (lng * Math.PI) / 180;
       const bearingRad = (bearing * Math.PI) / 180;
 
-      // Calculate destination point
       const angularDistance = distance / EARTH_RADIUS;
 
       const lat2 = Math.asin(
@@ -125,7 +114,6 @@ const NetworkMap = () => {
           Math.cos(angularDistance) - Math.sin(latRad) * Math.sin(lat2)
         );
 
-      // Convert back to degrees
       return {
         lat: (lat2 * 180) / Math.PI,
         lng: (lng2 * 180) / Math.PI,
@@ -134,11 +122,10 @@ const NetworkMap = () => {
     []
   );
 
-  // Create circle coordinates for a given radius
   const createCircleCoordinates = useCallback(
     (centerLat, centerLng, radius) => {
       const points = [];
-      const numPoints = 64; // Number of points to approximate the circle
+      const numPoints = 64;
 
       for (let i = 0; i <= numPoints; i++) {
         const bearing = (i * 360) / numPoints;
@@ -148,7 +135,7 @@ const NetworkMap = () => {
           radius,
           bearing
         );
-        points.push([point.lng, point.lat]); // Note: [lng, lat] for GeoJSON
+        points.push([point.lng, point.lat]);
       }
 
       return points;
@@ -156,14 +143,12 @@ const NetworkMap = () => {
     [calculateDestinationPoint]
   );
 
-  // Safe function to check if layer exists before removing
   const safeRemoveLayer = useCallback((mapInstance, layerId) => {
     if (mapInstance && mapInstance.getLayer && mapInstance.getLayer(layerId)) {
       mapInstance.removeLayer(layerId);
     }
   }, []);
 
-  // Safe function to check if source exists before removing
   const safeRemoveSource = useCallback((mapInstance, sourceId) => {
     if (
       mapInstance &&
@@ -174,21 +159,16 @@ const NetworkMap = () => {
     }
   }, []);
 
-  // Draw concentric circles at specified intervals - with map loaded check
   const drawRadiusCircles = useCallback(
     (maxDistance = 1000, interval = 100) => {
       if (!map || !isMapLoaded.current) return;
 
       try {
-        // Remove existing radius circles if they exist
         safeRemoveLayer(map, "radius-circles-layer");
         safeRemoveLayer(map, "radius-circles-labels");
         safeRemoveSource(map, "radius-circles");
 
-        // Calculate how many circles to draw
         const numCircles = Math.ceil(maxDistance / interval);
-
-        // Create GeoJSON for circles
         const circleFeatures = [];
 
         for (let i = 1; i <= numCircles; i++) {
@@ -199,7 +179,6 @@ const NetworkMap = () => {
             radius
           );
 
-          // Create a line string for the circle
           circleFeatures.push({
             type: "Feature",
             geometry: {
@@ -208,14 +187,11 @@ const NetworkMap = () => {
             },
             properties: {
               radius: radius,
-              // Use different opacity based on distance (further = more transparent)
               opacity: Math.max(0.2, 1 - i * 0.1),
-              // Use a consistent color with varying opacity
               color: `rgba(52, 152, 219, ${Math.max(0.2, 1 - i * 0.1)})`,
             },
           });
 
-          // Add a label for every other circle or for significant distances
           if (radius % 200 === 0 || radius === interval) {
             circleFeatures.push({
               type: "Feature",
@@ -246,7 +222,6 @@ const NetworkMap = () => {
           }
         }
 
-        // Add source
         map.addSource("radius-circles", {
           type: "geojson",
           data: {
@@ -255,20 +230,18 @@ const NetworkMap = () => {
           },
         });
 
-        // Add line layer for circles
         map.addLayer({
           id: "radius-circles-layer",
           type: "line",
           source: "radius-circles",
-          filter: ["!=", "type", "label"], // Exclude labels from line layer
+          filter: ["!=", "type", "label"],
           paint: {
             "line-color": ["get", "color"],
             "line-width": 2,
-            "line-dasharray": [2, 2], // Dashed line for better visibility
+            "line-dasharray": [2, 2],
           },
         });
 
-        // Add symbol layer for labels
         map.addLayer({
           id: "radius-circles-labels",
           type: "symbol",
@@ -299,12 +272,10 @@ const NetworkMap = () => {
     ]
   );
 
-  // Build GeoJSON for routes
   const buildRoutesGeoJSON = useCallback((elements) => {
     return {
       type: "FeatureCollection",
       features: elements.map((conn, index) => {
-        // decode into [lat, lng], then swap → [lng, lat]
         const decoded = polyline
           .decode(conn.polyline)
           .map(([lat, lng]) => [lng, lat]);
@@ -324,13 +295,11 @@ const NetworkMap = () => {
     };
   }, []);
 
-  // Render connections with markers - with map loaded check
   const renderConnections = useCallback(
     async (connections) => {
       if (!map || !olaMaps || !isMapLoaded.current) return;
 
       try {
-        // Clear existing markers
         const mapContainer = map.getContainer();
         const existingMarkers =
           mapContainer.querySelectorAll(".location-marker");
@@ -340,20 +309,16 @@ const NetworkMap = () => {
           }
         });
 
-        // Remove existing routes
+        // Always clean up route layer and source
         safeRemoveLayer(map, "routes-layer");
         safeRemoveSource(map, "routes");
 
-        // Add new markers
+        // Add markers
         for (let conn of connections) {
           const markerElement = createLocationMarkerElement(conn);
           markerElement.classList.add("location-marker");
-
           olaMaps
-            .addMarker({
-              element: markerElement,
-              anchor: "center",
-            })
+            .addMarker({ element: markerElement, anchor: "center" })
             .setLngLat([
               Number(conn.coordinates.longitude),
               Number(conn.coordinates.latitude),
@@ -361,7 +326,6 @@ const NetworkMap = () => {
             .addTo(map);
         }
 
-        // Create distance matrix request
         if (connections.length > 0) {
           const locationString = connections
             .map(
@@ -369,8 +333,6 @@ const NetworkMap = () => {
                 `${conn.coordinates.latitude}%2C${conn.coordinates.longitude}`
             )
             .join("%7C");
-
-          console.log("Location string for distance matrix:", locationString);
 
           const response = await fetch(
             `https://api.olamaps.io/routing/v1/distanceMatrix?origins=${CENTRAL_HUB.lat}%2C${CENTRAL_HUB.lng}&destinations=${locationString}&api_key=dxEuToWnHB5W4e4lcqiFwu2RwKA64Ixi0BFR73kQ`,
@@ -397,34 +359,32 @@ const NetworkMap = () => {
             location: connections[index]?.coordinates || "N/A",
           }));
 
-          console.log("Distance Matrix converted:", convertedElements);
           const geojson = buildRoutesGeoJSON(convertedElements);
 
-          // Add routes source and layer
+          // Add or update source
           if (!map.getSource("routes")) {
-            map.addSource("routes", {
-              type: "geojson",
-              data: geojson,
-            });
+            map.addSource("routes", { type: "geojson", data: geojson });
           } else {
             map.getSource("routes").setData(geojson);
           }
 
-          if (!map.getLayer("routes-layer")) {
-            map.addLayer({
-              id: "routes-layer",
-              type: "line",
-              source: "routes",
-              layout: { "line-join": "round", "line-cap": "round" },
-              paint: {
-                "line-width": 4,
-                "line-color": ["get", "color"],
-              },
-            });
+          // 👇 Only add layer if routes should be visible
+          if (showRoutes) {
+            if (!map.getLayer("routes-layer")) {
+              map.addLayer({
+                id: "routes-layer",
+                type: "line",
+                source: "routes",
+                layout: { "line-join": "round", "line-cap": "round" },
+                paint: {
+                  "line-width": 4,
+                  "line-color": ["get", "color"],
+                },
+              });
+            }
           }
         }
 
-        // Calculate max distance for radius circles
         const maxDistance =
           connections.length > 0
             ? Math.max(
@@ -432,7 +392,6 @@ const NetworkMap = () => {
               )
             : 1000;
 
-        // Draw radius circles (at least up to 500m, or max distance + 100m)
         const circleMaxDistance = Math.max(
           500,
           Math.ceil(maxDistance / 100) * 100 + 100
@@ -450,24 +409,41 @@ const NetworkMap = () => {
       buildRoutesGeoJSON,
       safeRemoveLayer,
       safeRemoveSource,
+      showRoutes,
     ]
   );
-  useEffect(() => {
-    if (map || olaMaps) {
-      console.log("Thiz is map Val in NetworkMap : ", map, olaMaps);
-    }
-  }, [map, olaMaps]);
 
-  // Initialize map and fetch data
+  // 👇 Toggle function to show/hide routes
+  const toggleRoutes = useCallback(() => {
+    if (!map || !isMapLoaded.current) return;
+
+    if (showRoutes) {
+      // Hide routes
+      safeRemoveLayer(map, "routes-layer");
+    } else {
+      // Show routes (re-add layer if source exists)
+      if (map.getSource("routes") && !map.getLayer("routes-layer")) {
+        map.addLayer({
+          id: "routes-layer",
+          type: "line",
+          source: "routes",
+          layout: { "line-join": "round", "line-cap": "round" },
+          paint: {
+            "line-width": 4,
+            "line-color": ["get", "color"],
+          },
+        });
+      }
+    }
+    setShowRoutes(!showRoutes);
+  }, [map, showRoutes, safeRemoveLayer]);
+
   useEffect(() => {
     if (!map || !olaMaps) return;
-    console.log("Thiz is map Val in NetworkMap : ", map, olaMaps);
 
-    // Wait for map to be fully loaded
     const handleMapLoad = () => {
       isMapLoaded.current = true;
 
-      // Set up map click handler
       const handleClick = (e) => {
         const { lng, lat } = e.lngLat;
         handleMapClick({ longitude: lng, latitude: lat });
@@ -475,27 +451,20 @@ const NetworkMap = () => {
 
       map.on("click", handleClick);
 
-      // Fit map to central hub initially
       map.flyTo({
         center: [parseFloat(CENTRAL_HUB.lng), parseFloat(CENTRAL_HUB.lat)],
         zoom: 14,
         duration: 1000,
       });
 
-      // Fetch data
       fetchData();
 
-      // Store cleanup function
       return () => {
         cleanupScheduled.current = true;
         map.off("click", handleClick);
-
-        // Clean up layers
         safeRemoveLayer(map, "radius-circles-layer");
         safeRemoveLayer(map, "radius-circles-labels");
         safeRemoveLayer(map, "routes-layer");
-
-        // Clean up sources
         safeRemoveSource(map, "radius-circles");
         safeRemoveSource(map, "routes");
       };
@@ -508,7 +477,6 @@ const NetworkMap = () => {
       const handleStyleLoad = () => {
         map.off("styledata", handleStyleLoad);
         const cleanup = handleMapLoad();
-
         return () => {
           if (cleanup) cleanup();
         };
@@ -523,22 +491,9 @@ const NetworkMap = () => {
     }
   }, [map, olaMaps, safeRemoveLayer, safeRemoveSource]);
 
-  // Update filtered locations when all locations change
   useEffect(() => {
     setFilteredLocations(allLocations);
   }, [allLocations]);
-
-  // Re-render connections when filtered locations change
-  // useEffect(() => {
-  //   if (
-  //     map &&
-  //     olaMaps &&
-  //     isMapLoaded.current &&
-  //     filteredLocations.length >= 0
-  //   ) {
-  //     renderConnections(filteredLocations);
-  //   }
-  // }, [filteredLocations, map, olaMaps, renderConnections]);
 
   useEffect(() => {
     if (map && olaMaps && isMapLoaded.current && locationsForMap.length >= 0) {
@@ -546,14 +501,9 @@ const NetworkMap = () => {
     }
   }, [locationsForMap, map, olaMaps, renderConnections]);
 
-  const handleMapServiceTypeFilterChange = (serviceTypeId) => {
-    setMapServiceTypeFilter(serviceTypeId);
-  };
-
   const API_BASE_URL =
     process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
 
-  // Fetch data function
   const fetchData = async () => {
     try {
       const [locationsRes, servicesRes, serviceTypesRes] = await Promise.all([
@@ -562,7 +512,6 @@ const NetworkMap = () => {
         axios.get("/api/service-types"),
       ]);
 
-      // Fix image URLs for all locations
       const fixedLocations = locationsRes.data.map((loc) => {
         if (loc.image && loc.image.startsWith("/uploads")) {
           return {
@@ -577,25 +526,22 @@ const NetworkMap = () => {
       setServices(servicesRes.data);
       setServiceTypes(serviceTypesRes.data);
 
-      // Render connections after setting state
       setTimeout(() => {
         if (map && olaMaps && isMapLoaded.current) {
           renderConnections(fixedLocations);
         }
       }, 100);
     } catch (error) {
-      console.log("Error fetching locations, services, service-types:", error);
+      console.log("Error fetching data:", error);
       setError("Failed to fetch data");
     } finally {
       setLoading(false);
     }
   };
-  // Handle filters change
-  // Handle filters change
+
   const handleFiltersChange = (filters) => {
     let filtered = [...allLocations];
 
-    // 🔍 Apply search filter
     if (filters.searchTerm) {
       const searchTerm = filters.searchTerm.toLowerCase();
       filtered = filtered.filter(
@@ -608,25 +554,21 @@ const NetworkMap = () => {
       );
     }
 
-    // 🛠 Apply service filter (multi-select)
     if (filters.service.length > 0) {
       filtered = filtered.filter((location) =>
         filters.service.includes(location.serviceName._id)
       );
     }
 
-    // 🛠 Apply service type filter (multi-select)
     if (filters.serviceType.length > 0) {
       filtered = filtered.filter((location) =>
         filters.serviceType.includes(location.serviceType._id)
       );
     }
 
-    // 📏 Apply distance range filter (multi-select)
     if (filters.distanceRange.length > 0) {
       filtered = filtered.filter((location) => {
         const distance = location.distanceFromCentralHub;
-
         return filters.distanceRange.some((range) => {
           if (range.includes("+")) {
             const min = Number.parseInt(range.replace("+", ""));
@@ -639,12 +581,10 @@ const NetworkMap = () => {
       });
     }
 
-    // 🔃 Apply sorting (can select multiple, apply in order)
     if (filters.sortBy.length > 0) {
       filters.sortBy.forEach((sortKey) => {
         filtered.sort((a, b) => {
           let aValue, bValue;
-
           switch (sortKey) {
             case "name":
               aValue = a.serviceName?.name || "";
@@ -664,7 +604,6 @@ const NetworkMap = () => {
               bValue = b.distanceFromCentralHub;
               break;
           }
-
           if (filters.sortOrder.includes("desc")) {
             return aValue < bValue ? 1 : -1;
           }
@@ -676,71 +615,71 @@ const NetworkMap = () => {
     setFilteredLocations(filtered);
   };
 
-  // Handle map click to add location
   const handleMapClick = (coordinates) => {
     setClickedCoordinates(coordinates);
     setShowAddModal(true);
   };
 
-  // Handle location created
   const handleLocationCreated = (newLocation) => {
-    // Fix image URL if it exists and is relative
     if (newLocation.image && newLocation.image.startsWith("/uploads")) {
       newLocation.image = `${API_BASE_URL}${newLocation.image}`;
     }
-
     setAllLocations((prev) => [...prev, newLocation]);
     setSuccess("Location added successfully!");
-
-    // Re-render connections with new location
     setTimeout(() => {
       if (map && olaMaps && isMapLoaded.current) {
         renderConnections([...allLocations, newLocation]);
       }
     }, 100);
-
     setTimeout(() => setSuccess(""), 3000);
   };
 
-  // Handle close modal
   const handleCloseModal = () => {
     setShowAddModal(false);
     setClickedCoordinates(null);
   };
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       cleanupScheduled.current = true;
     };
   }, []);
 
-  // if (loading) {
-  //   return <div className="loading">Loading network map...</div>;
-  // }
-
   return (
     <div>
       <div className="relative">
         <MapContainer className="w-full h-[600px]" />
 
-        {/* overlays */}
-        <div className="absolute top-4 left-0 w-[250px] px-4 flex justify-between">
-          {/* Advanced Filters on left */}
-          <div className="flex items-start">
-            <AdvancedFilters
-              onFiltersChange={handleFiltersChange}
-              services={services}
-              serviceTypes={serviceTypes}
-              locations={filteredLocations}
-            />
-          </div>
+        {/* 👇 Toggle Button - Top Right */}
+        <div className="absolute top-4 right-4 z-10">
+          <button
+            onClick={toggleRoutes}
+            className={`px-4 py-2 rounded-md text-white font-medium shadow-md transition-colors ${
+              showRoutes
+                ? "bg-red-500 hover:bg-red-600"
+                : "bg-green-500 hover:bg-green-600"
+            }`}
+          >
+            {showRoutes ? "Hide Routes" : "Show Routes"}
+          </button>
         </div>
-        {/* SearchBox centered absolutely */}
+
+        {/* Left Filters */}
+        <div className="absolute top-4 left-0 w-[250px] px-4">
+          <AdvancedFilters
+            onFiltersChange={handleFiltersChange}
+            services={services}
+            serviceTypes={serviceTypes}
+            locations={filteredLocations}
+          />
+        </div>
+
+        {/* Center Search */}
         <div className="absolute top-2 left-1/2 -translate-x-1/2">
           <SearchBox />
         </div>
       </div>
+
       <NetworkAnalytics
         locations={filteredLocations}
         serviceTypes={serviceTypes}
@@ -752,18 +691,14 @@ const NetworkMap = () => {
         services={services}
         serviceTypes={serviceTypes}
       />
-      <AdvancedFilters
-        onFiltersChange={handleFiltersChange}
-        services={services}
-        serviceTypes={serviceTypes}
-        locations={filteredLocations}
-      />
+
       <AddLocationModal
         isOpen={showAddModal}
         onClose={handleCloseModal}
         coordinates={clickedCoordinates}
         onLocationCreated={handleLocationCreated}
       />
+
       <div className="card">
         <div className="card-header">
           <h3 className="card-title">
