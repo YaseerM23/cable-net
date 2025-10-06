@@ -1,39 +1,43 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { useAuth } from "../contexts/AuthContext"
-import { useNavigate } from "react-router-dom"
-import "./Login.css"
+import { useState } from "react";
+import { useAuth } from "../contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
+import "./Login.css";
+import useUserStore from "../store/adminStore";
 
 const Login = () => {
-  const [username, setUsername] = useState("")
-  const [password, setPassword] = useState("")
-  const [error, setError] = useState("")
-  const [loading, setLoading] = useState(false)
-  const { login } = useAuth()
-  const navigate = useNavigate()
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const { login } = useAuth();
+  const navigate = useNavigate();
+  const { setUser } = useUserStore();
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
+    e.preventDefault();
 
     if (!username || !password) {
-      setError("Please fill in all fields")
-      return
+      setError("Please fill in all fields");
+      return;
     }
 
-    setLoading(true)
-    setError("")
+    setLoading(true);
+    setError("");
 
-    const result = await login(username, password)
+    const result = await login(username, password);
 
     if (result.success) {
-      navigate("/dashboard")
+      setUser(result.user);
+      localStorage.setItem("auth", JSON.stringify(result.user));
+      navigate("/dashboard");
     } else {
-      setError(result.error)
+      setError(result.error);
     }
 
-    setLoading(false)
-  }
+    setLoading(false);
+  };
 
   return (
     <div className="login-container">
@@ -80,7 +84,7 @@ const Login = () => {
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default Login
+export default Login;

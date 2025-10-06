@@ -36,6 +36,10 @@ const adminSchema = new mongoose.Schema({
   password: { type: String, required: true },
   role: { type: String, default: "admin" },
   createdAt: { type: Date, default: Date.now },
+  geojson: {
+    type: Object,
+    default: null,
+  },
 });
 
 const Admin = mongoose.model("Admin", adminSchema);
@@ -97,10 +101,49 @@ app.post("/api/auth/login", async (req, res) => {
         id: admin._id,
         username: admin.username,
         role: admin.role,
+        geojson: admin.geojson,
       },
     });
   } catch (error) {
     console.error("Login error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+app.put("/api/admin/:adminId/geojson", async (req, res) => {
+  try {
+    const { geojson } = req.body;
+    const { adminId } = req.params;
+
+    if (!adminId) {
+      return res.status(400).json({ message: "Admin ID is required" });
+    }
+
+    if (!geojson || typeof geojson !== "object") {
+      return res.status(400).json({ message: "Valid GeoJSON data required" });
+    }
+
+    const updatedAdmin = await Admin.findByIdAndUpdate(
+      adminId,
+      { geojson },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedAdmin) {
+      return res.status(404).json({ message: "Admin not found" });
+    }
+
+    res.status(200).json({
+      message: "GeoJSON updated successfully",
+      user: {
+        id: updatedAdmin._id,
+        username: updatedAdmin.username,
+        role: updatedAdmin.role,
+        geojson: updatedAdmin.geojson,
+      },
+    });
+  } catch (error) {
+    console.error("GeoJSON update error:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 });
