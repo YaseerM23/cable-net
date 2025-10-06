@@ -14,6 +14,7 @@ import polyline from "polyline";
 import { SearchBox } from "../components/Map/AutoComplete";
 import MapContainer from "../components/Map/MapContainer";
 import { useMemo } from "react";
+import useUserStore from "../store/adminStore";
 
 const NetworkMap = () => {
   const [allLocations, setAllLocations] = useState([]);
@@ -28,12 +29,135 @@ const NetworkMap = () => {
   const [hoveredLocation, setHoveredLocation] = useState(null);
   const [mapServiceTypeFilter, setMapServiceTypeFilter] = useState("");
   const [showRoutes, setShowRoutes] = useState(true); // 👈 Route visibility state
-
+  const [convertedElements, setConvertedElements] = useState([]);
+  const [geojsonVal, setGeojsonVal] = useState(null);
+  const [saveCableBtn, setSaveCableBtn] = useState(false);
+  const convertedElementsRef = useRef(null);
+  const geojsonRef = useRef(null);
+  // const mapRef = useRef(null);
+  // const olamapsRef = useRef(null);
+  const allLocationsRef = useRef(null);
   const { map, olaMaps } = useMap();
+  const { user, setUser } = useUserStore();
+
+  useEffect(() => {
+    convertedElementsRef.current = convertedElements;
+    geojsonRef.current = geojsonVal;
+    allLocationsRef.current = allLocations;
+  }, [convertedElements, geojsonVal, allLocations]);
+
+  const mapRef = useRef(null);
+  const olaMapsRef = useRef(null);
+  const userRef = useRef(null);
+
+  useEffect(() => {
+    if (map) mapRef.current = map;
+  }, [map]);
+
+  useEffect(() => {
+    if (olaMaps) olaMapsRef.current = olaMaps;
+  }, [olaMaps]);
+
+  useEffect(() => {
+    if (user) userRef.current = user;
+  }, [user]);
+
   const isMapLoaded = useRef(false);
   const cleanupScheduled = useRef(false);
 
   const EARTH_RADIUS = 6378137;
+
+  // drawCable function
+  const drawCable = useCallback((location, onCancel, onSave) => {
+    const map = mapRef.current;
+    const olaMaps = olaMapsRef.current;
+    const user = userRef.current;
+
+    if (!map || !olaMaps || !isMapLoaded.current) {
+      console.log("Returning:", map, olaMaps, isMapLoaded);
+      return;
+    }
+    try {
+      const geojson = user.geojson;
+      const idx = allLocationsRef.current.findIndex(
+        (el) =>
+          el.coordinates?.latitude === location.coordinates?.latitude &&
+          el.coordinates?.longitude === location.coordinates?.longitude
+      );
+
+      const routeCoords = geojson.features[idx].geometry.coordinates.map(
+        ([lng, lat]) => [lat, lng]
+      );
+      const interval = 1; // show a marker every 5 points
+
+      // Store markers in case you want to remove later
+      const markers = [];
+      const updatedGeoJSON = { ...geojson }; // clone to keep updates tracked
+
+      routeCoords.forEach((coord, index) => {
+        if (index % interval !== 0) return;
+
+        const markerEl = document.createElement("div");
+        markerEl.className =
+          "w-5 h-5 rounded-full bg-red-400 border-2 border-white cursor-grab z-50";
+
+        const marker = olaMaps
+          .addMarker({ element: markerEl, anchor: "center", draggable: true })
+          .setLngLat([Number(coord[1]), Number(coord[0])])
+          .addTo(map);
+
+        marker.on("drag", (event) => {
+          const { lat, lng } = event.target._lngLat;
+          routeCoords[index] = [lat, lng];
+
+          // // Update only this feature's coordinates
+          updatedGeoJSON.features[idx].geometry.coordinates = routeCoords.map(
+            ([lat, lng]) => [lng, lat]
+          );
+          map.getSource("routes").setData(updatedGeoJSON); // redraw
+        });
+
+        markers.push(marker);
+      });
+      // ✅ Attach cancel/save handlers
+      if (onCancel) {
+        onCancel(() => {
+          markers.forEach((m) => m.remove());
+          console.log("Cable drawing cancelled");
+        });
+      }
+
+      if (onSave) {
+        onSave(async () => {
+          const geojsonResponse = await axios.put(
+            `/api/admin/${user.id}/geojson`,
+            {
+              geojson: updatedGeoJSON,
+            }
+          );
+          if (geojsonResponse.status === 200) {
+            alert("Cable saved successfully ✅:", geojson);
+            markers.forEach((m) => m.remove());
+            const updateUser = geojsonResponse.data.user;
+            setUser(updateUser);
+            localStorage.setItem("auth", JSON.stringify(updateUser));
+            // Add or update source
+            if (!map.getSource("routes")) {
+              map.addSource("routes", { type: "geojson", data: geojson });
+            } else {
+              map.getSource("routes").setData(geojson);
+            }
+          }
+        });
+      }
+    } catch (error) {
+      console.log("Error While Custom Route : ", error);
+    }
+  }, []);
+
+  const handleMakeCable = () => {};
+
+  const handleCancelCable = () => {};
 
   const createLocationMarkerElement = useCallback((location) => {
     const el = document.createElement("div");
@@ -72,16 +196,82 @@ const NetworkMap = () => {
       ).toLocaleString()}</div>
     `;
 
+    // 👉 Buttons container
+    const btnContainer = document.createElement("div");
+    btnContainer.className = "flex gap-2 mt-3";
+
+    // Make Cable button
+    const makeBtn = document.createElement("button");
+    makeBtn.innerText = "Make Cable";
+    makeBtn.className =
+      "px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition";
+    btnContainer.appendChild(makeBtn);
+
+    // Save button (hidden initially)
+    const saveBtn = document.createElement("button");
+    saveBtn.innerText = "Save";
+    saveBtn.className =
+      "px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition hidden";
+    btnContainer.appendChild(saveBtn);
+
+    // Cancel button (hidden initially)
+    const cancelBtn = document.createElement("button");
+    cancelBtn.innerText = "Cancel";
+    cancelBtn.className =
+      "px-3 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600 transition hidden";
+    btnContainer.appendChild(cancelBtn);
+
+    popupDiv.appendChild(btnContainer);
     el.appendChild(popupDiv);
 
-    el.addEventListener("mouseenter", () => {
-      popupDiv.classList.remove("hidden");
-      setHoveredLocation(location);
+    // 🧠 Handlers
+    let cancelHandler = null;
+    let saveHandler = null;
+
+    makeBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      drawCable(
+        location,
+        (cancelCb) => (cancelHandler = cancelCb),
+        (saveCb) => (saveHandler = saveCb)
+      );
+      makeBtn.classList.add("hidden");
+      saveBtn.classList.remove("hidden");
+      cancelBtn.classList.remove("hidden");
     });
 
-    el.addEventListener("mouseleave", () => {
-      popupDiv.classList.add("hidden");
-      setHoveredLocation(null);
+    cancelBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      cancelHandler?.();
+      makeBtn.classList.remove("hidden");
+      saveBtn.classList.add("hidden");
+      cancelBtn.classList.add("hidden");
+    });
+
+    saveBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      saveHandler?.();
+      makeBtn.classList.remove("hidden");
+      saveBtn.classList.add("hidden");
+      cancelBtn.classList.add("hidden");
+    });
+
+    // ✅ Only show/hide on click
+    el.addEventListener("click", (e) => {
+      e.stopPropagation(); // prevent map click from interfering
+
+      const isHidden = popupDiv.classList.contains("hidden");
+      document
+        .querySelectorAll(".location-popup")
+        .forEach((p) => p.classList.add("hidden")); // close others
+
+      if (isHidden) {
+        popupDiv.classList.remove("hidden");
+        setHoveredLocation(location);
+      } else {
+        popupDiv.classList.add("hidden");
+        setHoveredLocation(null);
+      }
     });
 
     return el;
@@ -325,63 +515,87 @@ const NetworkMap = () => {
             ])
             .addTo(map);
         }
-
-        if (connections.length > 0) {
-          const locationString = connections
-            .map(
-              (conn) =>
-                `${conn.coordinates.latitude}%2C${conn.coordinates.longitude}`
-            )
-            .join("%7C");
-
-          const response = await fetch(
-            `https://api.olamaps.io/routing/v1/distanceMatrix?origins=${CENTRAL_HUB.lat}%2C${CENTRAL_HUB.lng}&destinations=${locationString}&api_key=dxEuToWnHB5W4e4lcqiFwu2RwKA64Ixi0BFR73kQ`,
-            {
-              method: "GET",
-              headers: { "X-Request-Id": "XXX" },
-            }
-          );
-
-          const data = await response.json();
-          const elements = data.rows[0].elements;
-          const convertedElements = elements.map((el, index) => ({
-            distance: el.distance,
-            duration: `${Math.floor(el.duration / 3600)} hrs ${Math.floor(
-              (el.duration % 3600) / 60
-            )} min`,
-            polyline: el.polyline,
-            service: connections[index]?.serviceName,
-            serviceType: connections[index]?.serviceType,
-            createdAt: connections[index]?.createdAt,
-            distanceFromCentralHub: connections[index]?.distanceFromCentralHub,
-            image: connections[index]?.image,
-            notes: connections[index]?.notes,
-            location: connections[index]?.coordinates || "N/A",
-          }));
-
-          const geojson = buildRoutesGeoJSON(convertedElements);
-
+        if (user.geojson) {
           // Add or update source
+          const geojson = user.geojson;
           if (!map.getSource("routes")) {
             map.addSource("routes", { type: "geojson", data: geojson });
           } else {
             map.getSource("routes").setData(geojson);
           }
+        } else {
+          if (connections.length > 0) {
+            const locationString = connections
+              .map(
+                (conn) =>
+                  `${conn.coordinates.latitude}%2C${conn.coordinates.longitude}`
+              )
+              .join("%7C");
 
-          // 👇 Only add layer if routes should be visible
-          if (showRoutes) {
-            if (!map.getLayer("routes-layer")) {
-              map.addLayer({
-                id: "routes-layer",
-                type: "line",
-                source: "routes",
-                layout: { "line-join": "round", "line-cap": "round" },
-                paint: {
-                  "line-width": 4,
-                  "line-color": ["get", "color"],
-                },
-              });
+            console.log("The Geojson Routing Api is calling ..");
+
+            const response = await fetch(
+              `https://api.olamaps.io/routing/v1/distanceMatrix?origins=${CENTRAL_HUB.lat}%2C${CENTRAL_HUB.lng}&destinations=${locationString}&api_key=dxEuToWnHB5W4e4lcqiFwu2RwKA64Ixi0BFR73kQ`,
+              {
+                method: "GET",
+                headers: { "X-Request-Id": "XXX" },
+              }
+            );
+
+            const data = await response.json();
+            const elements = data.rows[0].elements;
+            const convertedElementsVal = elements.map((el, index) => ({
+              distance: el.distance,
+              duration: `${Math.floor(el.duration / 3600)} hrs ${Math.floor(
+                (el.duration % 3600) / 60
+              )} min`,
+              polyline: el.polyline,
+              service: connections[index]?.serviceName,
+              serviceType: connections[index]?.serviceType,
+              createdAt: connections[index]?.createdAt,
+              distanceFromCentralHub:
+                connections[index]?.distanceFromCentralHub,
+              image: connections[index]?.image,
+              notes: connections[index]?.notes,
+              location: connections[index]?.coordinates || "N/A",
+            }));
+            setConvertedElements(convertedElementsVal);
+
+            const geojson = buildRoutesGeoJSON(convertedElementsVal);
+            setGeojsonVal(geojson);
+            const geojsonResponse = await axios.put(
+              `/api/admin/${user.id}/geojson`,
+              {
+                geojson,
+              }
+            );
+            if (geojsonResponse.status === 200) {
+              const updateUser = geojsonResponse.data.user;
+              setUser(updateUser);
+              localStorage.setItem("auth", JSON.stringify(updateUser));
+              // Add or update source
+              if (!map.getSource("routes")) {
+                map.addSource("routes", { type: "geojson", data: geojson });
+              } else {
+                map.getSource("routes").setData(geojson);
+              }
             }
+          }
+        }
+
+        // 👇 Only add layer if routes should be visible
+        if (showRoutes) {
+          if (!map.getLayer("routes-layer")) {
+            map.addLayer({
+              id: "routes-layer",
+              type: "line",
+              source: "routes",
+              layout: { "line-join": "round", "line-cap": "round" },
+              paint: {
+                "line-width": 4,
+                "line-color": ["get", "color"],
+              },
+            });
           }
         }
 
@@ -663,6 +877,25 @@ const NetworkMap = () => {
             {showRoutes ? "Hide Routes" : "Show Routes"}
           </button>
         </div>
+
+        {/* 👇 Make Cable & Cancel Buttons - Visible only if saveCableBtn = true */}
+        {saveCableBtn && (
+          <div className="absolute bottom-6 right-6 z-10 flex gap-3">
+            <button
+              onClick={handleMakeCable}
+              className="px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-lg transition-all"
+            >
+              Make Cable
+            </button>
+
+            <button
+              onClick={handleCancelCable}
+              className="px-5 py-2.5 rounded-lg bg-gray-400 hover:bg-gray-500 text-white font-semibold shadow-lg transition-all"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
 
         {/* Left Filters */}
         <div className="absolute top-4 left-0 w-[250px] px-4">

@@ -1,7 +1,7 @@
 "use client";
 import { useAuth } from "../contexts/AuthContext";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Home,
   Map,
@@ -12,12 +12,19 @@ import {
   Menu,
   X,
 } from "lucide-react";
+import useUserStore from "../store/adminStore";
 
 const Layout = ({ children }) => {
   const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const { setUser } = useUserStore();
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem("auth");
+    if (storedUser) setUser(JSON.parse(storedUser));
+  }, [setUser]);
 
   const handleLogout = () => {
     logout();
