@@ -15,6 +15,7 @@ import { SearchBox } from "../components/Map/AutoComplete";
 import MapContainer from "../components/Map/MapContainer";
 import { useMemo } from "react";
 import useUserStore from "../store/adminStore";
+import Swal from "sweetalert2";
 
 const NetworkMap = () => {
   const [allLocations, setAllLocations] = useState([]);
@@ -68,7 +69,7 @@ const NetworkMap = () => {
   const EARTH_RADIUS = 6378137;
 
   // drawCable function
-  const drawCable = useCallback((location, onCancel, onSave) => {
+  const drawCable = useCallback((location, onCancel, onSave, interval = 1) => {
     const map = mapRef.current;
     const olaMaps = olaMapsRef.current;
     const user = userRef.current;
@@ -88,7 +89,6 @@ const NetworkMap = () => {
       const routeCoords = geojson.features[idx].geometry.coordinates.map(
         ([lng, lat]) => [lat, lng]
       );
-      const interval = 1; // show a marker every 5 points
 
       // Store markers in case you want to remove later
       const markers = [];
@@ -235,14 +235,45 @@ const NetworkMap = () => {
 
     makeBtn.addEventListener("click", (e) => {
       e.stopPropagation();
-      drawCable(
-        location,
-        (cancelCb) => (cancelHandler = cancelCb),
-        (saveCb) => (saveHandler = saveCb)
-      );
-      makeBtn.classList.add("hidden");
-      saveBtn.classList.remove("hidden");
-      cancelBtn.classList.remove("hidden");
+      Swal.fire({
+        title: "Set Cable Marker Interval",
+        html: `
+          <img src="/map-interval.png" alt="Interval example" class="rounded-md mb-3 shadow-sm" />
+          <p class="text-gray-600 text-sm mb-2">
+            Smaller interval → more markers (more draggable points).<br>
+            Larger interval → fewer markers (simpler cable path).
+          </p>
+          <input id="intervalInput" type="number" min="1" value="3" class="swal2-input" />
+        `,
+
+        confirmButtonText: "Start Drawing",
+        showCancelButton: true,
+        cancelButtonText: "Cancel",
+        preConfirm: () => {
+          const value = parseInt(
+            document.getElementById("intervalInput")?.value || "0"
+          );
+          if (!value || value < 1) {
+            Swal.showValidationMessage("Please enter a valid interval (>=1)");
+          }
+          return value;
+        },
+      }).then((result) => {
+        if (!result.isConfirmed) return; // user canceled
+
+        const interval = result.value;
+
+        drawCable(
+          location,
+          (cancelCb) => (cancelHandler = cancelCb),
+          (saveCb) => (saveHandler = saveCb),
+          interval // 👈 pass chosen interval
+        );
+
+        makeBtn.classList.add("hidden");
+        saveBtn.classList.remove("hidden");
+        cancelBtn.classList.remove("hidden");
+      });
     });
 
     cancelBtn.addEventListener("click", (e) => {
