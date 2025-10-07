@@ -173,28 +173,33 @@ const NetworkMap = () => {
     popupDiv.className =
       "location-popup hidden absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 bg-white p-3 rounded shadow-lg border z-10 w-64";
     popupDiv.innerHTML = `
-      <div class="font-bold text-gray-800">${
-        location.serviceName?.name || "Unknown Service"
-      }</div>
-      <div class="text-sm text-gray-600 mt-1">${
-        location.serviceType?.name || "Unknown Type"
-      }</div>
-      <div class="text-xs text-gray-500 mt-2">
-        <div>Lat: ${location.coordinates?.latitude?.toFixed(6) || "N/A"}</div>
-        <div>Lng: ${location.coordinates?.longitude?.toFixed(6) || "N/A"}</div>
-      </div>
-      <div class="text-xs text-gray-500 mt-1">Distance: ${
-        location.distanceFromCentralHub || 0
-      }m</div>
-      ${
-        location.notes
-          ? `<div class="text-xs text-gray-500 mt-1 truncate">${location.notes}</div>`
-          : ""
-      }
-      <div class="text-xs text-gray-400 mt-1">${new Date(
-        location.createdAt
-      ).toLocaleString()}</div>
-    `;
+  ${
+    location.image
+      ? `<img src="${location.image}" alt="Location" class="w-full h-32 object-cover rounded mb-2" />`
+      : ""
+  }
+  <div class="font-bold text-gray-800">${
+    location.serviceName?.name || "Unknown Service"
+  }</div>
+  <div class="text-sm text-gray-600 mt-1">${
+    location.serviceType?.name || "Unknown Type"
+  }</div>
+  <div class="text-xs text-gray-500 mt-2">
+    <div>Lat: ${location.coordinates?.latitude?.toFixed(6) || "N/A"}</div>
+    <div>Lng: ${location.coordinates?.longitude?.toFixed(6) || "N/A"}</div>
+  </div>
+  <div class="text-xs text-gray-500 mt-1">Distance: ${
+    location.distanceFromCentralHub || 0
+  }m</div>
+  ${
+    location.notes
+      ? `<div class="text-xs text-gray-500 mt-1 truncate">${location.notes}</div>`
+      : ""
+  }
+  <div class="text-xs text-gray-400 mt-1">${new Date(
+    location.createdAt
+  ).toLocaleString()}</div>
+`;
 
     // 👉 Buttons container
     const btnContainer = document.createElement("div");
