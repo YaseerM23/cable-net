@@ -834,18 +834,71 @@ const NetworkMap = () => {
     setShowAddModal(true);
   };
 
-  const handleLocationCreated = (newLocation) => {
-    if (newLocation.image && newLocation.image.startsWith("/uploads")) {
-      newLocation.image = `${API_BASE_URL}${newLocation.image}`;
-    }
-    setAllLocations((prev) => [...prev, newLocation]);
-    setSuccess("Location added successfully!");
-    setTimeout(() => {
-      if (map && olaMaps && isMapLoaded.current) {
-        renderConnections([...allLocations, newLocation]);
+  const handleLocationCreated = async (newLocation) => {
+    try {
+      if (newLocation.image && newLocation.image.startsWith("/uploads")) {
+        newLocation.image = `${API_BASE_URL}${newLocation.image}`;
       }
-    }, 100);
-    setTimeout(() => setSuccess(""), 3000);
+      const response = await fetch(
+        `https://api.olamaps.io/routing/v1/distanceMatrix?origins=${CENTRAL_HUB.lat}%2C${CENTRAL_HUB.lng}&destinations=${newLocation?.coordinates.latitude}%2C${newLocation?.coordinates.longitude}&api_key=dxEuToWnHB5W4e4lcqiFwu2RwKA64Ixi0BFR73kQ`,
+        {
+          method: "GET",
+          headers: { "X-Request-Id": "XXX" },
+        }
+      );
+      const data = await response.json();
+      const elements = data.rows[0].elements;
+      const decoded = polyline
+        .decode(elements[0].polyline)
+        .map(([lat, lng]) => [lng, lat]);
+      const addRoute = {
+        type: "Feature",
+        geometry: {
+          type: "LineString",
+          coordinates: decoded,
+        },
+        properties: {
+          color: newLocation.serviceType?.colorForMarking || "#3498db",
+          id: user.geojson ? user.geojson.features.length : 0,
+        },
+      };
+
+      const updatedGeoJSON = { ...user.geojson };
+      updatedGeoJSON.features.push(addRoute);
+
+      const geojsonResponse = await axios.put(`/api/admin/${user.id}/geojson`, {
+        geojson: updatedGeoJSON,
+      });
+      if (geojsonResponse.status === 200) {
+        alert("Connection created successfully ✅:");
+        const updateUser = geojsonResponse.data.user;
+        setUser(updateUser);
+        localStorage.setItem("auth", JSON.stringify(updateUser));
+
+        const markerElement = createLocationMarkerElement(newLocation);
+        markerElement.classList.add("location-marker");
+        olaMaps
+          .addMarker({ element: markerElement, anchor: "center" })
+          .setLngLat([
+            Number(newLocation.coordinates.longitude),
+            Number(newLocation.coordinates.latitude),
+          ])
+          .addTo(map);
+
+        map.getSource("routes").setData(updatedGeoJSON); // redraw
+
+        setAllLocations((prev) => [...prev, newLocation]);
+        setSuccess("Location added successfully!");
+        setTimeout(() => {
+          if (map && olaMaps && isMapLoaded.current) {
+            renderConnections([...allLocations, newLocation]);
+          }
+        }, 100);
+        setTimeout(() => setSuccess(""), 3000);
+      }
+    } catch (error) {
+      console.log("Error While Creating a Location : ", error);
+    }
   };
 
   const handleCloseModal = () => {
