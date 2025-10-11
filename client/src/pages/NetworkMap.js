@@ -6,16 +6,14 @@ import AddLocationModal from "../components/AddLocationModal";
 import NetworkAnalytics from "../components/NetworkAnalytics";
 import AdvancedFilters from "../components/AdvancedFilters";
 import NetworkExport from "../components/NetworkExport";
-import MapProvider, {
-  CENTRAL_HUB,
-  useMap,
-} from "../components/Map/MapProvider";
+import { CENTRAL_HUB, useMap } from "../components/Map/MapProvider";
 import polyline from "polyline";
 import { SearchBox } from "../components/Map/AutoComplete";
 import MapContainer from "../components/Map/MapContainer";
 import { useMemo } from "react";
 import useUserStore from "../store/adminStore";
 import Swal from "sweetalert2";
+// import * as turf from "@turf/turf";
 
 const NetworkMap = () => {
   const [allLocations, setAllLocations] = useState([]);
@@ -30,22 +28,9 @@ const NetworkMap = () => {
   const [hoveredLocation, setHoveredLocation] = useState(null);
   const [mapServiceTypeFilter, setMapServiceTypeFilter] = useState("");
   const [showRoutes, setShowRoutes] = useState(true); // 👈 Route visibility state
-  const [convertedElements, setConvertedElements] = useState([]);
-  const [geojsonVal, setGeojsonVal] = useState(null);
-  const [saveCableBtn, setSaveCableBtn] = useState(false);
-  const convertedElementsRef = useRef(null);
-  const geojsonRef = useRef(null);
-  // const mapRef = useRef(null);
-  // const olamapsRef = useRef(null);
-  const allLocationsRef = useRef(null);
   const { map, olaMaps } = useMap();
   const { user, setUser } = useUserStore();
-
-  useEffect(() => {
-    convertedElementsRef.current = convertedElements;
-    geojsonRef.current = geojsonVal;
-    allLocationsRef.current = allLocations;
-  }, [convertedElements, geojsonVal, allLocations]);
+  // console.log("The geojson : ", user.geojson);
 
   const mapRef = useRef(null);
   const olaMapsRef = useRef(null);
@@ -69,7 +54,7 @@ const NetworkMap = () => {
   const EARTH_RADIUS = 6378137;
 
   // drawCable function
-  const drawCable = useCallback((location, onCancel, onSave, interval = 1) => {
+  const drawCable = useCallback((location, onCancel, onSave) => {
     const map = mapRef.current;
     const olaMaps = olaMapsRef.current;
     const user = userRef.current;
@@ -80,7 +65,9 @@ const NetworkMap = () => {
     }
     try {
       const geojson = user.geojson;
-      const idx = allLocationsRef.current.findIndex(
+      console.log("MakeCable coordinate : ", location);
+
+      const idx = geojson.features.findIndex(
         (el) =>
           el.coordinates?.latitude === location.coordinates?.latitude &&
           el.coordinates?.longitude === location.coordinates?.longitude
@@ -90,9 +77,12 @@ const NetworkMap = () => {
         ([lng, lat]) => [lat, lng]
       );
 
+      // const line = turf.lineString(routeCoords);
+
       // Store markers in case you want to remove later
+      const interval = 1;
       const markers = [];
-      const updatedGeoJSON = { ...geojson }; // clone to keep updates tracked
+      const updatedGeoJSON = structuredClone(geojson);
 
       routeCoords.forEach((coord, index) => {
         if (index % interval !== 0) return;
@@ -119,11 +109,38 @@ const NetworkMap = () => {
 
         markers.push(marker);
       });
+
       // ✅ Attach cancel/save handlers
       if (onCancel) {
-        onCancel(() => {
-          markers.forEach((m) => m.remove());
-          console.log("Cable drawing cancelled");
+        onCancel(async () => {
+          const result = await Swal.fire({
+            title: "Discard changes?",
+            text: "Your unsaved cable edits will be lost.",
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonText: "Yes, discard",
+            cancelButtonText: "No, keep editing",
+            confirmButtonColor: "#e74c3c",
+            cancelButtonColor: "#2ecc71",
+          });
+
+          if (result.isConfirmed) {
+            // 🗑️ Remove all draggable markers
+            markers.forEach((m) => m.remove());
+
+            // 🔄 Restore original GeoJSON data (no edits)
+            map.getSource("routes").setData(geojson);
+
+            Swal.fire({
+              title: "Changes discarded",
+              text: "Your route has been restored to its original shape.",
+              icon: "success",
+              timer: 1500,
+              showConfirmButton: false,
+            });
+
+            console.log("Cable drawing cancelled and reverted");
+          }
         });
       }
 
@@ -143,9 +160,12 @@ const NetworkMap = () => {
             localStorage.setItem("auth", JSON.stringify(updateUser));
             // Add or update source
             if (!map.getSource("routes")) {
-              map.addSource("routes", { type: "geojson", data: geojson });
+              map.addSource("routes", {
+                type: "geojson",
+                data: updatedGeoJSON,
+              });
             } else {
-              map.getSource("routes").setData(geojson);
+              map.getSource("routes").setData(updatedGeoJSON);
             }
           }
         });
@@ -154,10 +174,6 @@ const NetworkMap = () => {
       console.log("Error While Custom Route : ", error);
     }
   }, []);
-
-  const handleMakeCable = () => {};
-
-  const handleCancelCable = () => {};
 
   const createLocationMarkerElement = useCallback((location) => {
     const el = document.createElement("div");
@@ -235,45 +251,15 @@ const NetworkMap = () => {
 
     makeBtn.addEventListener("click", (e) => {
       e.stopPropagation();
-      Swal.fire({
-        title: "Set Cable Marker Interval",
-        html: `
-          <img src="/map-interval.png" alt="Interval example" class="rounded-md mb-3 shadow-sm" />
-          <p class="text-gray-600 text-sm mb-2">
-            Smaller interval → more markers (more draggable points).<br>
-            Larger interval → fewer markers (simpler cable path).
-          </p>
-          <input id="intervalInput" type="number" min="1" value="3" class="swal2-input" />
-        `,
+      drawCable(
+        location,
+        (cancelCb) => (cancelHandler = cancelCb),
+        (saveCb) => (saveHandler = saveCb)
+      );
 
-        confirmButtonText: "Start Drawing",
-        showCancelButton: true,
-        cancelButtonText: "Cancel",
-        preConfirm: () => {
-          const value = parseInt(
-            document.getElementById("intervalInput")?.value || "0"
-          );
-          if (!value || value < 1) {
-            Swal.showValidationMessage("Please enter a valid interval (>=1)");
-          }
-          return value;
-        },
-      }).then((result) => {
-        if (!result.isConfirmed) return; // user canceled
-
-        const interval = result.value;
-
-        drawCable(
-          location,
-          (cancelCb) => (cancelHandler = cancelCb),
-          (saveCb) => (saveHandler = saveCb),
-          interval // 👈 pass chosen interval
-        );
-
-        makeBtn.classList.add("hidden");
-        saveBtn.classList.remove("hidden");
-        cancelBtn.classList.remove("hidden");
-      });
+      makeBtn.classList.add("hidden");
+      saveBtn.classList.remove("hidden");
+      cancelBtn.classList.remove("hidden");
     });
 
     cancelBtn.addEventListener("click", (e) => {
@@ -516,6 +502,7 @@ const NetworkMap = () => {
             color: conn.serviceType?.colorForMarking || "#3498db",
             id: index,
           },
+          coordinates: conn.location,
         };
       }),
     };
@@ -595,10 +582,8 @@ const NetworkMap = () => {
               notes: connections[index]?.notes,
               location: connections[index]?.coordinates || "N/A",
             }));
-            setConvertedElements(convertedElementsVal);
 
             const geojson = buildRoutesGeoJSON(convertedElementsVal);
-            setGeojsonVal(geojson);
             const geojsonResponse = await axios.put(
               `/api/admin/${user.id}/geojson`,
               {
@@ -897,6 +882,7 @@ const NetworkMap = () => {
           color: newLocation.serviceType?.colorForMarking || "#3498db",
           id: user.geojson ? user.geojson.features.length : 0,
         },
+        coordinates: newLocation.coordinates,
       };
 
       const updatedGeoJSON = { ...user.geojson };
@@ -966,25 +952,6 @@ const NetworkMap = () => {
             {showRoutes ? "Hide Routes" : "Show Routes"}
           </button>
         </div>
-
-        {/* 👇 Make Cable & Cancel Buttons - Visible only if saveCableBtn = true */}
-        {saveCableBtn && (
-          <div className="absolute bottom-6 right-6 z-10 flex gap-3">
-            <button
-              onClick={handleMakeCable}
-              className="px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-lg transition-all"
-            >
-              Make Cable
-            </button>
-
-            <button
-              onClick={handleCancelCable}
-              className="px-5 py-2.5 rounded-lg bg-gray-400 hover:bg-gray-500 text-white font-semibold shadow-lg transition-all"
-            >
-              Cancel
-            </button>
-          </div>
-        )}
 
         {/* Left Filters */}
         <div className="absolute top-4 left-0 w-[250px] px-4">
