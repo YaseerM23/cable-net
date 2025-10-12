@@ -13,7 +13,7 @@ import MapContainer from "../components/Map/MapContainer";
 import { useMemo } from "react";
 import useUserStore from "../store/adminStore";
 import Swal from "sweetalert2";
-// import * as turf from "@turf/turf";
+import * as turf from "@turf/turf";
 
 const NetworkMap = () => {
   const [allLocations, setAllLocations] = useState([]);
@@ -77,7 +77,9 @@ const NetworkMap = () => {
         ([lng, lat]) => [lat, lng]
       );
 
-      // const line = turf.lineString(routeCoords);
+      const line = turf.lineString(geojson.features[idx].geometry.coordinates);
+      const length = turf.length(line, { units: "meters" });
+      console.log("Route length:", length, "ms");
 
       // Store markers in case you want to remove later
       const interval = 1;
@@ -775,79 +777,125 @@ const NetworkMap = () => {
   };
 
   const handleFiltersChange = (filters) => {
-    let filtered = [...allLocations];
+    try {
+      let filtered = [...allLocations];
 
-    if (filters.searchTerm) {
-      const searchTerm = filters.searchTerm.toLowerCase();
-      filtered = filtered.filter(
-        (location) =>
-          location.notes?.toLowerCase().includes(searchTerm) ||
-          location.serviceName?.name?.toLowerCase().includes(searchTerm) ||
-          location.serviceType?.name?.toLowerCase().includes(searchTerm) ||
-          location.coordinates.latitude.toString().includes(searchTerm) ||
-          location.coordinates.longitude.toString().includes(searchTerm)
-      );
-    }
+      if (filters.searchTerm) {
+        const searchTerm = filters.searchTerm.toLowerCase();
+        filtered = filtered.filter(
+          (location) =>
+            location.notes?.toLowerCase().includes(searchTerm) ||
+            location.serviceName?.name?.toLowerCase().includes(searchTerm) ||
+            location.serviceType?.name?.toLowerCase().includes(searchTerm) ||
+            location.coordinates.latitude.toString().includes(searchTerm) ||
+            location.coordinates.longitude.toString().includes(searchTerm)
+        );
+      }
 
-    if (filters.service.length > 0) {
-      filtered = filtered.filter((location) =>
-        filters.service.includes(location.serviceName._id)
-      );
-    }
+      if (filters.service.length > 0) {
+        filtered = filtered.filter((location) =>
+          filters.service.includes(location.serviceName._id)
+        );
+      }
 
-    if (filters.serviceType.length > 0) {
-      filtered = filtered.filter((location) =>
-        filters.serviceType.includes(location.serviceType._id)
-      );
-    }
+      if (filters.serviceType.length > 0) {
+        filtered = filtered.filter((location) =>
+          filters.serviceType.includes(location.serviceType._id)
+        );
+      }
 
-    if (filters.distanceRange.length > 0) {
-      filtered = filtered.filter((location) => {
-        const distance = location.distanceFromCentralHub;
-        return filters.distanceRange.some((range) => {
-          if (range.includes("+")) {
-            const min = Number.parseInt(range.replace("+", ""));
-            return distance >= min;
-          } else {
-            const [min, max] = range.split("-").map(Number);
-            return distance >= min && distance < max;
-          }
+      if (filters.distanceRange.length > 0) {
+        filtered = filtered.filter((location) => {
+          const distance = location.distanceFromCentralHub;
+          return filters.distanceRange.some((range) => {
+            if (range.includes("+")) {
+              const min = Number.parseInt(range.replace("+", ""));
+              return distance >= min;
+            } else {
+              const [min, max] = range.split("-").map(Number);
+              return distance >= min && distance < max;
+            }
+          });
         });
-      });
-    }
+      }
 
-    if (filters.sortBy.length > 0) {
-      filters.sortBy.forEach((sortKey) => {
-        filtered.sort((a, b) => {
-          let aValue, bValue;
-          switch (sortKey) {
-            case "name":
-              aValue = a.serviceName?.name || "";
-              bValue = b.serviceName?.name || "";
-              break;
-            case "type":
-              aValue = a.serviceType?.name || "";
-              bValue = b.serviceType?.name || "";
-              break;
-            case "created":
-              aValue = new Date(a.createdAt);
-              bValue = new Date(b.createdAt);
-              break;
-            case "distance":
-            default:
-              aValue = a.distanceFromCentralHub;
-              bValue = b.distanceFromCentralHub;
-              break;
-          }
-          if (filters.sortOrder.includes("desc")) {
-            return aValue < bValue ? 1 : -1;
-          }
-          return aValue > bValue ? 1 : -1;
+      if (filters.sortBy.length > 0) {
+        filters.sortBy.forEach((sortKey) => {
+          filtered.sort((a, b) => {
+            let aValue, bValue;
+            switch (sortKey) {
+              case "name":
+                aValue = a.serviceName?.name || "";
+                bValue = b.serviceName?.name || "";
+                break;
+              case "type":
+                aValue = a.serviceType?.name || "";
+                bValue = b.serviceType?.name || "";
+                break;
+              case "created":
+                aValue = new Date(a.createdAt);
+                bValue = new Date(b.createdAt);
+                break;
+              case "distance":
+              default:
+                aValue = a.distanceFromCentralHub;
+                bValue = b.distanceFromCentralHub;
+                break;
+            }
+            if (filters.sortOrder.includes("desc")) {
+              return aValue < bValue ? 1 : -1;
+            }
+            return aValue > bValue ? 1 : -1;
+          });
         });
-      });
-    }
+      }
+      const user = userRef.current;
+      const geojson = user.geojson;
+      const updatedGeoJSON = structuredClone(geojson);
+      const features = JSON.parse(
+        JSON.stringify(userRef.current.geojson.features)
+      );
+      const filtered2 = features.filter((f) => f);
 
-    setFilteredLocations(filtered);
+      updatedGeoJSON.features = filtered2.filter((feature) => {
+        const latitude = feature.coordinates?.latitude;
+        const longitude = feature.coordinates?.longitude;
+        return filtered.some(
+          (conn) =>
+            conn.coordinates.latitude === latitude &&
+            conn.coordinates.longitude === longitude
+        );
+      });
+
+      safeRemoveSource();
+      safeRemoveLayer();
+      map.getSource("routes").setData(updatedGeoJSON); // redraw
+
+      // now updatedGeoJSON only contains the filtered connections
+      if (map.getSource("routes")) {
+        map.getSource("routes").setData(updatedGeoJSON);
+      } else {
+        map.addSource("routes", {
+          type: "geojson",
+          data: updatedGeoJSON,
+        });
+
+        map.addLayer({
+          id: "routes",
+          type: "line",
+          source: "routes",
+          paint: {
+            "line-color": "#007bff",
+            "line-width": 3,
+          },
+        });
+      }
+      setFilteredLocations(filtered);
+    } catch (error) {
+      console.log(
+        ("Error while Handling the Filtering the Locations : ", error)
+      );
+    }
   };
 
   const handleMapClick = (coordinates) => {

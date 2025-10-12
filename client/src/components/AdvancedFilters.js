@@ -87,22 +87,45 @@ const AdvancedFilters = ({
           filters.sortOrder.length > 0) && (
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Filter size={16} className="text-gray-600" />
-              <span className="text-sm font-semibold text-gray-700">
-                Active Filters
+              <span className="inline-flex items-center gap-1 bg-blue-500 text-white px-2 py-1 rounded-full text-xs font-medium shadow-sm">
+                <Filter size={12} />
+                <span className="font-bold">
+                  {Object.values(filters).flat().length}
+                </span>
               </span>
-              <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded-full font-medium">
-                {Object.values(filters).flat().length} active
+              <button
+                onClick={clearAll}
+                className="inline-flex items-center justify-center bg-red-500 text-white w-6 h-6 rounded-full text-xs font-medium shadow-sm hover:bg-red-600 transition-colors"
+                title="Clear all filters"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {filters.searchTerm && (
+          <>
+            <div className="flex items-center gap-2">
+              <div className="w-1.5 h-4 bg-black rounded-full"></div>
+              <span className="text-xs bg-white-500 font-semibold text-gray-700 uppercase tracking-wide">
+                Search
               </span>
             </div>
-            <button
-              onClick={clearFilter}
-              className="text-xs text-gray-500 hover:text-red-600 transition-colors flex items-center gap-1"
-            >
-              <X size={12} />
-              Clear all
-            </button>
-          </div>
+            <span className="inline-flex items-center gap-1 bg-white text-gray-800 px-2 py-1 rounded-full text-xs border border-gray-200">
+              <span>"{filters.searchTerm}"</span>
+              <button
+                onClick={() => {
+                  const newFilters = { ...filters, searchTerm: "" };
+                  setFilters(newFilters);
+                  onFiltersChange(newFilters);
+                }}
+                className="p-0.5 rounded-full hover:bg-gray-50"
+              >
+                <X size={10} className="text-gray-500" />
+              </button>
+            </span>
+          </>
         )}
 
         {/* Filter Sections */}
@@ -111,25 +134,25 @@ const AdvancedFilters = ({
           {filters.service.length > 0 && (
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <div className="w-1 h-4 bg-blue-500 rounded-full"></div>
-                <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                <div className="w-1.5 h-4 bg-blue-500 rounded-full"></div>
+                <span className="text-xs bg-white-500 font-semibold text-gray-700 uppercase tracking-wide">
                   Service
                 </span>
               </div>
               <div className="flex flex-wrap gap-2">
                 {filters.service.map((id) => (
-                  <div
+                  <span
                     key={id}
-                    className="flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-2 rounded-lg text-sm border border-blue-200 hover:bg-blue-100 transition-colors"
+                    className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-xs font-medium"
                   >
                     <span>{getServiceName(id)}</span>
                     <button
                       onClick={() => clearFilter("service", id)}
                       className="p-0.5 rounded-full hover:bg-blue-200 transition-colors"
                     >
-                      <X size={12} className="text-blue-600" />
+                      <X size={10} className="text-blue-600" />
                     </button>
-                  </div>
+                  </span>
                 ))}
               </div>
             </div>
@@ -139,25 +162,25 @@ const AdvancedFilters = ({
           {filters.serviceType.length > 0 && (
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <div className="w-1 h-4 bg-purple-500 rounded-full"></div>
+                <div className="w-1.5 h-4 bg-purple-500 rounded-full"></div>
                 <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
                   Service Type
                 </span>
               </div>
               <div className="flex flex-wrap gap-2">
                 {filters.serviceType.map((id) => (
-                  <div
+                  <span
                     key={id}
-                    className="flex items-center gap-2 bg-purple-50 text-purple-700 px-3 py-2 rounded-lg text-sm border border-purple-200 hover:bg-purple-100 transition-colors"
+                    className="inline-flex items-center gap-1 bg-purple-100 text-purple-700 px-2 py-1 rounded-full text-xs font-medium"
                   >
                     <span>{getServiceTypeName(id)}</span>
                     <button
                       onClick={() => clearFilter("serviceType", id)}
                       className="p-0.5 rounded-full hover:bg-purple-200 transition-colors"
                     >
-                      <X size={12} className="text-purple-600" />
+                      <X size={10} className="text-purple-600" />
                     </button>
-                  </div>
+                  </span>
                 ))}
               </div>
             </div>
@@ -167,25 +190,25 @@ const AdvancedFilters = ({
           {filters.distanceRange.length > 0 && (
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <div className="w-1 h-4 bg-green-500 rounded-full"></div>
+                <div className="w-1.5 h-4 bg-green-500 rounded-full"></div>
                 <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
                   Distance Range
                 </span>
               </div>
               <div className="flex flex-wrap gap-2">
                 {filters.distanceRange.map((range) => (
-                  <div
+                  <span
                     key={range}
-                    className="flex items-center gap-2 bg-green-50 text-green-700 px-3 py-2 rounded-lg text-sm border border-green-200 hover:bg-green-100 transition-colors"
+                    className="inline-flex items-center gap-1 bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-medium"
                   >
                     <span>{range}</span>
                     <button
                       onClick={() => clearFilter("distanceRange", range)}
                       className="p-0.5 rounded-full hover:bg-green-200 transition-colors"
                     >
-                      <X size={12} className="text-green-600" />
+                      <X size={10} className="text-green-600" />
                     </button>
-                  </div>
+                  </span>
                 ))}
               </div>
             </div>
@@ -195,25 +218,25 @@ const AdvancedFilters = ({
           {filters.sortBy.length > 0 && (
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <div className="w-1 h-4 bg-orange-500 rounded-full"></div>
+                <div className="w-1.5 h-4 bg-orange-500 rounded-full"></div>
                 <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
                   Sort By
                 </span>
               </div>
               <div className="flex flex-wrap gap-2">
                 {filters.sortBy.map((sort) => (
-                  <div
+                  <span
                     key={sort}
-                    className="flex items-center gap-2 bg-orange-50 text-orange-700 px-3 py-2 rounded-lg text-sm border border-orange-200 hover:bg-orange-100 transition-colors"
+                    className="inline-flex items-center gap-1 bg-orange-100 text-orange-700 px-2 py-1 rounded-full text-xs font-medium"
                   >
                     <span>{sort}</span>
                     <button
                       onClick={() => clearFilter("sortBy", sort)}
                       className="p-0.5 rounded-full hover:bg-orange-200 transition-colors"
                     >
-                      <X size={12} className="text-orange-600" />
+                      <X size={10} className="text-orange-600" />
                     </button>
-                  </div>
+                  </span>
                 ))}
               </div>
             </div>
@@ -223,25 +246,25 @@ const AdvancedFilters = ({
           {filters.sortOrder.length > 0 && (
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <div className="w-1 h-4 bg-red-500 rounded-full"></div>
+                <div className="w-1.5 h-4 bg-red-500 rounded-full"></div>
                 <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
                   Sort Order
                 </span>
               </div>
               <div className="flex flex-wrap gap-2">
                 {filters.sortOrder.map((order) => (
-                  <div
+                  <span
                     key={order}
-                    className="flex items-center gap-2 bg-red-50 text-red-700 px-3 py-2 rounded-lg text-sm border border-red-200 hover:bg-red-100 transition-colors"
+                    className="inline-flex items-center gap-1 bg-red-100 text-red-700 px-2 py-1 rounded-full text-xs font-medium"
                   >
                     <span>{order === "asc" ? "Ascending" : "Descending"}</span>
                     <button
                       onClick={() => clearFilter("sortOrder", order)}
                       className="p-0.5 rounded-full hover:bg-red-200 transition-colors"
                     >
-                      <X size={12} className="text-red-600" />
+                      <X size={10} className="text-red-600" />
                     </button>
-                  </div>
+                  </span>
                 ))}
               </div>
             </div>
@@ -264,7 +287,7 @@ const AdvancedFilters = ({
 
       {/* Sidebar */}
       {showFilters && (
-        <div className="fixed inset-0 z-40 flex">
+        <div className="fixed z-40 flex">
           <div className="fixed top-0 left-0 w-80 h-full bg-white shadow-lg p-4 z-50 overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold">Advanced Filters</h3>
