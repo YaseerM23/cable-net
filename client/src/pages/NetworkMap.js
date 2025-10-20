@@ -14,6 +14,8 @@ import { useMemo } from "react";
 import useUserStore from "../store/adminStore";
 import Swal from "sweetalert2";
 import * as turf from "@turf/turf";
+import { MapPin, Plug, Home, X, Square, LandPlot } from "lucide-react";
+import CreateAreaModal from "../components/CreateAreaModal";
 
 const NetworkMap = () => {
   const [allLocations, setAllLocations] = useState([]);
@@ -23,6 +25,7 @@ const NetworkMap = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showAreaModal, setShowAreaModal] = useState(false);
   const [clickedCoordinates, setClickedCoordinates] = useState(null);
   const [success, setSuccess] = useState("");
   const [hoveredLocation, setHoveredLocation] = useState(null);
@@ -30,6 +33,8 @@ const NetworkMap = () => {
   const [showRoutes, setShowRoutes] = useState(true); // 👈 Route visibility state
   const { map, olaMaps } = useMap();
   const { user, setUser } = useUserStore();
+  const [popupInfo, setPopupInfo] = useState(null);
+
   // console.log("The geojson : ", user.geojson);
 
   const mapRef = useRef(null);
@@ -675,6 +680,18 @@ const NetworkMap = () => {
     setShowRoutes(!showRoutes);
   }, [map, showRoutes, safeRemoveLayer]);
 
+  // 💡 On user selection
+  const handleSelect = (type) => {
+    if (!popupInfo) return;
+    if (type === "connection") setShowAddModal(true);
+    else setShowAreaModal(true);
+    setPopupInfo(null);
+  };
+  const handleMapClick = (coordinates) => {
+    setClickedCoordinates(coordinates);
+    setShowAddModal(true);
+  };
+
   useEffect(() => {
     if (!map || !olaMaps) return;
 
@@ -683,7 +700,21 @@ const NetworkMap = () => {
 
       const handleClick = (e) => {
         const { lng, lat } = e.lngLat;
-        handleMapClick({ longitude: lng, latitude: lat });
+        const point = map.project([lng, lat]);
+
+        setPopupInfo({
+          x: point.x,
+          y: point.y,
+          lng,
+          lat,
+        });
+
+        setClickedCoordinates({
+          x: point.x,
+          y: point.y,
+          longitude: lng,
+          latitude: lat,
+        });
       };
 
       map.on("click", handleClick);
@@ -898,10 +929,10 @@ const NetworkMap = () => {
     }
   };
 
-  const handleMapClick = (coordinates) => {
-    setClickedCoordinates(coordinates);
-    setShowAddModal(true);
-  };
+  // const handleMapClick = (coordinates) => {
+  //   setClickedCoordinates(coordinates);
+  //   setShowAddModal(true);
+  // };
 
   const handleLocationCreated = async (newLocation) => {
     try {
@@ -973,7 +1004,15 @@ const NetworkMap = () => {
 
   const handleCloseModal = () => {
     setShowAddModal(false);
-    setClickedCoordinates(null);
+    // setClickedCoordinates(null);
+  };
+
+  const handleCloseAreaModal = () => {
+    setShowAreaModal(false);
+  };
+
+  const handleAreaCreated = () => {
+    alert("AREA CREATED ..✅");
   };
 
   useEffect(() => {
@@ -1035,6 +1074,58 @@ const NetworkMap = () => {
         coordinates={clickedCoordinates}
         onLocationCreated={handleLocationCreated}
       />
+
+      <CreateAreaModal
+        isOpen={showAreaModal}
+        onClose={handleCloseAreaModal}
+        coordinates={clickedCoordinates}
+        onLocationCreated={handleAreaCreated}
+        onSafeRemoveLayer={safeRemoveLayer}
+        onSafeRemoveSource={safeRemoveSource}
+      />
+
+      {popupInfo && (
+        <div
+          className="absolute z-10 flex flex-col gap-2 bg-white p-3 rounded-lg shadow-lg border border-gray-200 animate-bounce-in"
+          style={{
+            left: popupInfo.x,
+            top: popupInfo.y,
+            transform: "translate(150%, -65%)",
+          }}
+        >
+          {/* Header */}
+          <div className="flex items-center gap-2 pb-1 border-b border-gray-100">
+            <MapPin size={14} className="text-blue-600" />
+            <h3 className="text-xs font-bold text-gray-800">Create New</h3>
+          </div>
+
+          {/* Action Buttons */}
+          <button
+            className="flex items-center gap-2 px-3 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-all duration-150 hover:scale-105 shadow-sm hover:shadow-md font-medium text-xs group"
+            onClick={() => handleSelect("connection")}
+          >
+            <Plug size={14} className="text-white" />
+            <span>Connection</span>
+          </button>
+
+          <button
+            className="flex items-center gap-2 px-3 py-2 bg-yellow-500 text-white rounded-md hover:bg-yellow-600 transition-all duration-150 hover:scale-105 shadow-sm hover:shadow-md font-medium text-xs group"
+            onClick={() => handleSelect("area")}
+          >
+            <LandPlot size={14} className="text-white" />
+            <span>Area</span>
+          </button>
+
+          {/* Cancel Button */}
+          <button
+            className="flex items-center gap-1 px-2 py-1 text-[10px] text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors duration-150 justify-center group"
+            onClick={() => setPopupInfo(null)}
+          >
+            <X size={12} />
+            <span>Cancel</span>
+          </button>
+        </div>
+      )}
 
       <div className="card">
         <div className="card-header">

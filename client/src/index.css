@@ -3,3 +3,23 @@
 @tailwind utilities;
 
 
+@keyframes bounce-in {
+    0% {
+        opacity: 0;
+        scale: 0.3;
+    }
+
+    50% {
+        opacity: 1;
+        scale: 1.05;
+    }
+
+    100% {
+        opacity: 1;
+        scale: 1;
+    }
+}
+
+.animate-bounce-in {
+    animation: bounce-in 0.3s ease-out;
+}
