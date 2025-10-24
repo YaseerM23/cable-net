@@ -12,6 +12,8 @@ const AddLocationModal = ({
 }) => {
   const [services, setServices] = useState([]);
   const [serviceTypes, setServiceTypes] = useState([]);
+  const [imageFile2, setImageFile2] = useState(null);
+  const [imagePreview2, setImagePreview2] = useState(null);
   const [filteredServiceTypes, setFilteredServiceTypes] = useState([]);
   const [formData, setFormData] = useState({
     serviceName: "",
@@ -29,7 +31,9 @@ const AddLocationModal = ({
       // Reset form when modal opens
       setFormData({ serviceName: "", serviceType: "", notes: "" });
       setImageFile(null);
+      setImageFile2(null); // 👈 reset
       setImagePreview(null);
+      setImagePreview2(null); // 👈 reset
       setError("");
     }
   }, [isOpen]);
@@ -76,6 +80,24 @@ const AddLocationModal = ({
     }
   };
 
+  // Handle second image
+  const handleImageChange2 = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        setError("Image size must be less than 5MB");
+        return;
+      }
+      if (!file.type.startsWith("image/")) {
+        setError("Only image files are allowed");
+        return;
+      }
+      setImageFile2(file);
+      setImagePreview2(URL.createObjectURL(file));
+      setError("");
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -88,6 +110,7 @@ const AddLocationModal = ({
     formDataToSend.append("latitude", coordinates.latitude);
     formDataToSend.append("longitude", coordinates.longitude);
     if (imageFile) formDataToSend.append("image", imageFile);
+    if (imageFile2) formDataToSend.append("image2", imageFile2); // 👈
 
     try {
       const response = await axios.post("/api/locations", formDataToSend, {
@@ -289,6 +312,34 @@ const AddLocationModal = ({
                 <img
                   src={imagePreview}
                   alt="Preview"
+                  style={{
+                    maxHeight: "150px",
+                    maxWidth: "100%",
+                    borderRadius: "4px",
+                    border: "1px solid #ddd",
+                  }}
+                />
+              </div>
+            )}
+          </div>
+
+          <div style={{ marginBottom: "20px" }}>
+            <label
+              style={{
+                display: "block",
+                marginBottom: "6px",
+                fontWeight: "500",
+                color: "#333",
+              }}
+            >
+              Upload Second Image (Optional, max 5MB)
+            </label>
+            <input type="file" accept="image/*" onChange={handleImageChange2} />
+            {imagePreview2 && (
+              <div style={{ marginTop: "10px", textAlign: "center" }}>
+                <img
+                  src={imagePreview2}
+                  alt="Preview 2"
                   style={{
                     maxHeight: "150px",
                     maxWidth: "100%",

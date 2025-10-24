@@ -118,6 +118,291 @@ const ServiceTypes = () => {
     "🏨",
     "🏩",
     "🏰",
+    // Original icons
+    "📡",
+    "🔌",
+    "📶",
+    "🌐",
+    "⚡",
+    "🔧",
+    "📊",
+    "🎯",
+    "🔗",
+    "📋",
+    "🏢",
+    "🏠",
+    "🏭",
+    "🏪",
+    "🏫",
+    "🏥",
+    "🏦",
+    "🏨",
+    "🏩",
+    "🏰",
+
+    // Network & Technology
+    "🖥️",
+    "💻",
+    "📱",
+    "🖨️",
+    "⌨️",
+    "🖱️",
+    "📞",
+    "📠",
+    "📹",
+    "📼",
+    "💾",
+    "💿",
+    "📀",
+    "🧮",
+    "📟",
+    "📺",
+    "📻",
+    "🎙️",
+    "🎚️",
+    "🎛️",
+
+    // Infrastructure & Utilities
+    "🗼",
+    "🏗️",
+    "🚧",
+    "⚓",
+    "⛽",
+    "🏮",
+    "🗿",
+    "🏟️",
+    "🎪",
+    "🎭",
+    "🛤️",
+    "🛣️",
+    "🚦",
+    "🚥",
+    "🗺️",
+    "🧭",
+    "⛰️",
+    "🏔️",
+    "🌋",
+    "🏕️",
+
+    // Business & Commerce
+    "💼",
+    "💰",
+    "💵",
+    "💳",
+    "🧾",
+    "📈",
+    "📉",
+    "📅",
+    "📆",
+    "🕐",
+    "🕑",
+    "🕒",
+    "🕓",
+    "🕔",
+    "🕕",
+    "🕖",
+    "🕗",
+    "🕘",
+    "🕙",
+    "🕚",
+
+    // Transportation
+    "🚗",
+    "🚕",
+    "🚙",
+    "🚌",
+    "🚎",
+    "🏎️",
+    "🚓",
+    "🚑",
+    "🚒",
+    "🚐",
+    "🚚",
+    "🚛",
+    "🚜",
+    "🛴",
+    "🚲",
+    "🛵",
+    "🏍️",
+    "🚁",
+    "✈️",
+    "🛩️",
+
+    // Colored Circles (Heatmap style)
+    "🔴",
+    "🟠",
+    "🟡",
+    "🟢",
+    "🔵",
+    "🟣",
+    "🟤",
+    "⚫",
+    "⚪",
+    "🟥",
+    "🟧",
+    "🟨",
+    "🟩",
+    "🟦",
+    "🟪",
+    "🟫",
+    "⬛",
+    "⬜",
+    "◼️",
+    "◻️",
+    // Gradient colored circles
+    "🟥",
+    "🟧",
+    "🟨",
+    "🟩",
+    "🟦",
+    "🟪",
+    "🟫",
+    "🔴",
+    "🟠",
+    "🟡",
+    "🟢",
+    "🔵",
+    "🟣",
+    "🟤",
+    "❤️",
+    "🧡",
+    "💛",
+    "💚",
+    "💙",
+    "💜",
+    "🤎",
+
+    // Shapes & Symbols
+    "⭐",
+    "🌟",
+    "🌀",
+    "🌈",
+    "🌊",
+    "🔥",
+    "💧",
+    "🌙",
+    "☀️",
+    "☁️",
+    "⛈️",
+    "🌩️",
+    "🌪️",
+    "❄️",
+    "💨",
+    "🌫️",
+    "☄️",
+    "💫",
+    "✨",
+    "🎇",
+
+    // Indicators & Status
+    "✅",
+    "❌",
+    "⚠️",
+    "🚨",
+    "🔔",
+    "📢",
+    "📍",
+    "🛑",
+    "⭕",
+    "❓",
+    "❗",
+    "🔴",
+    "🟢",
+    "🟡",
+    "🔵",
+    "🟣",
+    "⚫",
+    "⚪",
+    "🔶",
+    "🔷",
+
+    // Professional & Office
+    "📁",
+    "📂",
+    "📃",
+    "📄",
+    "📑",
+    "📊",
+    "📈",
+    "📉",
+    "🗃️",
+    "🗄️",
+    "🗂️",
+    "📌",
+    "📍",
+    "📎",
+    "🖇️",
+    "✂️",
+    "📏",
+    "📐",
+    "🧰",
+    "🔨",
+
+    // Specialized Location Markers
+    "🗽",
+    "🏛️",
+    "💒",
+    "🕍",
+    "🕌",
+    "⛪",
+    "🛕",
+    "📿",
+    "⚱️",
+    "⚰️",
+    "🪦",
+    "🪔",
+    "💡",
+    "🔦",
+    "🕯️",
+    "⛺",
+    "🛖",
+    "🌠",
+    "🎆",
+    "🎑",
+
+    // Weather & Environment
+    "🌡️",
+    "🧪",
+    "🔬",
+    "🔭",
+    "📡",
+    "🛰️",
+    "🧲",
+    "🔋",
+    "🪫",
+    "🔌",
+    "💡",
+    "🔦",
+    "🕯️",
+    "🪔",
+    "🧭",
+    "🌡️",
+    "💧",
+    "💨",
+    "🔥",
+    "❄️",
+
+    // Additional colored variants
+    "1️⃣",
+    "2️⃣",
+    "3️⃣",
+    "4️⃣",
+    "5️⃣",
+    "6️⃣",
+    "7️⃣",
+    "8️⃣",
+    "9️⃣",
+    "🔟",
+    "🔠",
+    "🔡",
+    "🔢",
+    "🔣",
+    "🔤",
+    "🅰️",
+    "🅱️",
+    "🆎",
+    "🆑",
+    "🆒",
   ];
 
   if (loading) {
@@ -180,39 +465,144 @@ const ServiceTypes = () => {
 
             <div className="form-group">
               <label className="form-label">Color for Marking</label>
-              <div
-                style={{ display: "flex", alignItems: "center", gap: "10px" }}
-              >
-                <input
-                  type="color"
-                  value={formData.colorForMarking}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      colorForMarking: e.target.value,
-                    })
-                  }
-                  style={{
-                    width: "50px",
-                    height: "40px",
-                    border: "none",
-                    borderRadius: "4px",
-                  }}
-                />
-                <input
-                  type="text"
-                  className="form-input"
-                  value={formData.colorForMarking}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      colorForMarking: e.target.value,
-                    })
-                  }
-                  placeholder="#3498db"
-                  pattern="^#[0-9A-Fa-f]{6}$"
-                  style={{ flex: 1 }}
-                />
+              <div className="flex flex-col gap-4">
+                {/* Color Preview and Input */}
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-12 h-12 rounded-lg border border-gray-300 shadow-sm cursor-pointer"
+                    style={{ backgroundColor: formData.colorForMarking }}
+                    onClick={() =>
+                      document.getElementById("colorPicker").click()
+                    }
+                  />
+                  <input
+                    id="colorPicker"
+                    type="color"
+                    value={formData.colorForMarking}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        colorForMarking: e.target.value,
+                      })
+                    }
+                    className="sr-only" // Hide the default color input but keep it functional
+                  />
+                  <div className="flex-1">
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={formData.colorForMarking}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          colorForMarking: e.target.value,
+                        })
+                      }
+                      placeholder="#3498db"
+                      pattern="^#[0-9A-Fa-f]{6}$"
+                    />
+                  </div>
+                </div>
+
+                {/* Color Palette Grid */}
+                <div className="grid grid-cols-10 gap-2">
+                  {[
+                    "#FF0000",
+                    "#FF6B6B",
+                    "#FFA500",
+                    "#FFD93D",
+                    "#6BCF7F",
+                    "#4ECDC4",
+                    "#45B7D1",
+                    "#4D96FF",
+                    "#9B59B6",
+                    "#34495E",
+                    "#E74C3C",
+                    "#EC7063",
+                    "#E67E22",
+                    "#F1C40F",
+                    "#2ECC71",
+                    "#1ABC9C",
+                    "#3498DB",
+                    "#9B59B6",
+                    "#8E44AD",
+                    "#2C3E50",
+                    "#FF4757",
+                    "#FF6348",
+                    "#FFA502",
+                    "#FFFA65",
+                    "#7BED9F",
+                    "#70A1FF",
+                    "#5352ED",
+                    "#3742FA",
+                    "#2F3542",
+                    "#747D8C",
+                  ].map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      onClick={() =>
+                        setFormData({ ...formData, colorForMarking: color })
+                      }
+                      className="w-8 h-8 rounded border-2 border-gray-200 hover:border-gray-400 transition-all duration-200 hover:scale-110"
+                      style={{
+                        backgroundColor: color,
+                        borderColor:
+                          formData.colorForMarking === color
+                            ? "#3498db"
+                            : "#e5e7eb",
+                      }}
+                      title={color}
+                    />
+                  ))}
+                </div>
+
+                {/* Popular Colors Section */}
+                <div className="mt-2">
+                  <label className="text-sm text-gray-600 mb-2 block">
+                    Popular Colors
+                  </label>
+                  <div className="grid grid-cols-5 gap-2">
+                    {[
+                      { name: "Red", value: "#FF0000" },
+                      { name: "Green", value: "#00FF00" },
+                      { name: "Blue", value: "#0000FF" },
+                      { name: "Yellow", value: "#FFFF00" },
+                      { name: "Purple", value: "#800080" },
+                      { name: "Orange", value: "#FFA500" },
+                      { name: "Teal", value: "#008080" },
+                      { name: "Pink", value: "#FFC0CB" },
+                      { name: "Brown", value: "#A52A2A" },
+                      { name: "Gray", value: "#808080" },
+                    ].map((color) => (
+                      <button
+                        key={color.value}
+                        type="button"
+                        onClick={() =>
+                          setFormData({
+                            ...formData,
+                            colorForMarking: color.value,
+                          })
+                        }
+                        className="flex flex-col items-center gap-1 p-2 rounded-lg border border-gray-200 hover:border-gray-400 transition-all duration-200 hover:bg-gray-50"
+                        style={{
+                          borderColor:
+                            formData.colorForMarking === color.value
+                              ? "#3498db"
+                              : "#e5e7eb",
+                        }}
+                      >
+                        <div
+                          className="w-6 h-6 rounded border border-gray-300"
+                          style={{ backgroundColor: color.value }}
+                        />
+                        <span className="text-xs text-gray-600">
+                          {color.name}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
 

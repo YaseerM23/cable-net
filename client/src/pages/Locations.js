@@ -9,6 +9,8 @@ const Locations = () => {
   const [locations, setLocations] = useState([]);
   const [services, setServices] = useState([]);
   const [serviceTypes, setServiceTypes] = useState([]);
+  const [imageFile2, setImageFile2] = useState(null);
+  const [imagePreview2, setImagePreview2] = useState(null);
   const [filteredServiceTypes, setFilteredServiceTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -19,6 +21,7 @@ const Locations = () => {
     serviceName: "",
     serviceType: "",
     image: "", // Will store relative path or empty string
+    image2: "", // 👈
     notes: "",
     coordinates: {
       latitude: "",
@@ -126,6 +129,7 @@ const Locations = () => {
           formDataToSend.append("latitude", lat.toString());
           formDataToSend.append("longitude", lng.toString());
           formDataToSend.append("image", imageFile);
+          formDataToSend.append("image2", imageFile2);
 
           response = await axios.put(
             `/api/locations/${editingLocation._id}`,
@@ -148,6 +152,7 @@ const Locations = () => {
         if (imageFile) {
           formDataToSend.append("image", imageFile);
         }
+        if (imageFile2) formDataToSend.append("image2", imageFile2); // 👈
 
         response = await axios.post("/api/locations", formDataToSend, {
           headers: {
@@ -174,6 +179,7 @@ const Locations = () => {
       serviceName: location.serviceName?._id || "",
       serviceType: location.serviceType?._id || "",
       image: location.image || "", // Store full URL or empty
+      image2: location.image2 || "",
       notes: location.notes || "",
       coordinates: {
         latitude: location.coordinates.latitude.toString(),
@@ -181,7 +187,9 @@ const Locations = () => {
       },
     });
     setImageFile(null);
+    setImageFile2(null); // 👈
     setImagePreview(null);
+    setImagePreview2(null);
     setShowForm(true);
   };
 
@@ -233,6 +241,30 @@ const Locations = () => {
     } else {
       setError("Geolocation is not supported by this browser.");
     }
+  };
+
+  const handleImageChange2 = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        setError("Image size must be less than 5MB");
+        return;
+      }
+      if (!file.type.startsWith("image/")) {
+        setError("Only image files are allowed");
+        return;
+      }
+      setImageFile2(file);
+      setImagePreview2(URL.createObjectURL(file));
+      setError("");
+    }
+  };
+
+  const removeImage2 = () => {
+    setImageFile2(null);
+    setImagePreview2(null);
+    setFormData({ ...formData, image2: "" });
+    setError("");
   };
 
   const handleImageChange = (e) => {
@@ -544,6 +576,50 @@ const Locations = () => {
 
             <div>
               <label className="block text-sm font-medium mb-2 text-gray-700">
+                Upload Second Image (Optional, max 5MB)
+              </label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageChange2}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              />
+              {imagePreview2 && (
+                <div className="mt-3 flex items-center gap-4">
+                  <img
+                    src={imagePreview2}
+                    alt="Preview 2"
+                    className="h-20 w-20 object-cover rounded border border-gray-300"
+                  />
+                  <button
+                    type="button"
+                    onClick={removeImage2}
+                    className="px-3 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
+                  >
+                    Remove Image
+                  </button>
+                </div>
+              )}
+              {!imagePreview2 && formData.image2 && (
+                <div className="mt-3 flex items-center gap-4">
+                  <img
+                    src={formData.image2}
+                    alt="Current 2"
+                    className="h-20 w-20 object-cover rounded border border-gray-300"
+                  />
+                  <button
+                    type="button"
+                    onClick={removeImage2}
+                    className="px-3 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
+                  >
+                    Remove Image
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2 text-gray-700">
                 Notes (Optional)
               </label>
               <textarea
@@ -622,16 +698,27 @@ const Locations = () => {
               key: "image",
               header: "Image",
               className: "hidden md:table-cell",
-              render: (l) =>
-                l.image ? (
-                  <img
-                    src={l.image}
-                    alt="Location"
-                    className="h-10 w-10 object-cover rounded border"
-                  />
-                ) : (
-                  <span className="text-gray-500">-</span>
-                ),
+              render: (l) => (
+                <div className="flex gap-1">
+                  {l.image && (
+                    <img
+                      src={l.image}
+                      alt="1"
+                      className="h-8 w-8 object-cover rounded border"
+                    />
+                  )}
+                  {l.image2 && (
+                    <img
+                      src={l.image2}
+                      alt="2"
+                      className="h-8 w-8 object-cover rounded border"
+                    />
+                  )}
+                  {!l.image && !l.image2 && (
+                    <span className="text-gray-500">-</span>
+                  )}
+                </div>
+              ),
             },
           ]}
         />

@@ -45,58 +45,93 @@ router.get("/:id", async (req, res) => {
 });
 
 // Create new location
-router.post("/", upload.single("image"), async (req, res) => {
-  try {
-    // Build location data
-    const locationData = {
-      serviceName: req.body.serviceName,
-      serviceType: req.body.serviceType,
-      notes: req.body.notes || "",
-      coordinates: {
-        latitude: parseFloat(req.body.latitude),
-        longitude: parseFloat(req.body.longitude),
-      },
-    };
+// Create new location
+router.post(
+  "/",
+  upload.fields([
+    { name: "image", maxCount: 1 },
+    { name: "image2", maxCount: 1 },
+  ]),
+  async (req, res) => {
+    try {
+      const locationData = {
+        serviceName: req.body.serviceName,
+        serviceType: req.body.serviceType,
+        notes: req.body.notes || "",
+        coordinates: {
+          latitude: parseFloat(req.body.latitude),
+          longitude: parseFloat(req.body.longitude),
+        },
+      };
 
-    // Add image path if uploaded
-    if (req.file) {
-      locationData.image = `/uploads/${req.file.filename}`;
-    }
+      if (req.files?.image?.[0]) {
+        locationData.image = `/uploads/${req.files.image[0].filename}`;
+      }
+      if (req.files?.image2?.[0]) {
+        locationData.image2 = `/uploads/${req.files.image2[0].filename}`;
+      }
 
-    const location = new Location(locationData);
-    const savedLocation = await location.save();
-    const populatedLocation = await Location.findById(savedLocation._id)
-      .populate("serviceName")
-      .populate("serviceType");
+      const location = new Location(locationData);
+      const savedLocation = await location.save();
+      const populatedLocation = await Location.findById(savedLocation._id)
+        .populate("serviceName")
+        .populate("serviceType");
 
-    res.status(201).json(populatedLocation);
-  } catch (error) {
-    // Clean up uploaded file if validation fails
-    if (req.file) {
+      res.status(201).json(populatedLocation);
+    } catch (error) {
+      // Cleanup uploaded files
       const fs = require("fs");
-      fs.unlinkSync(req.file.path);
+      if (req.files?.image?.[0]) fs.unlinkSync(req.files.image[0].path);
+      if (req.files?.image2?.[0]) fs.unlinkSync(req.files.image2[0].path);
+      res.status(400).json({ message: error.message });
     }
-    res.status(400).json({ message: error.message });
   }
-});
+);
 
 // Update location
-router.put("/:id", async (req, res) => {
-  try {
-    const location = await Location.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true,
-    })
-      .populate("serviceName")
-      .populate("serviceType");
-    if (!location) {
-      return res.status(404).json({ message: "Location not found" });
+// Update location
+router.put(
+  "/:id",
+  upload.fields([
+    { name: "image", maxCount: 1 },
+    { name: "image2", maxCount: 1 },
+  ]),
+  async (req, res) => {
+    try {
+      const updateData = {
+        serviceName: req.body.serviceName,
+        serviceType: req.body.serviceType,
+        notes: req.body.notes,
+        coordinates: {
+          latitude: parseFloat(req.body.latitude),
+          longitude: parseFloat(req.body.longitude),
+        },
+      };
+
+      if (req.files?.image?.[0]) {
+        updateData.image = `/uploads/${req.files.image[0].filename}`;
+      }
+      if (req.files?.image2?.[0]) {
+        updateData.image2 = `/uploads/${req.files.image2[0].filename}`;
+      }
+
+      const location = await Location.findByIdAndUpdate(
+        req.params.id,
+        updateData,
+        { new: true, runValidators: true }
+      )
+        .populate("serviceName")
+        .populate("serviceType");
+
+      if (!location) {
+        return res.status(404).json({ message: "Location not found" });
+      }
+      res.json(location);
+    } catch (error) {
+      res.status(400).json({ message: error.message });
     }
-    res.json(location);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
   }
-});
+);
 
 // Delete location
 router.delete("/:id", async (req, res) => {

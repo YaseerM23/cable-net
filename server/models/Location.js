@@ -1,4 +1,4 @@
-const mongoose = require("mongoose")
+const mongoose = require("mongoose");
 
 const locationSchema = new mongoose.Schema({
   serviceName: {
@@ -14,6 +14,10 @@ const locationSchema = new mongoose.Schema({
   image: {
     type: String,
     required: false, // Image/diagram specific to this location
+  },
+  image2: {
+    type: String,
+    required: false, // Additional image/diagram specific to this location
   },
   notes: {
     type: String,
@@ -56,25 +60,29 @@ const locationSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
-})
+});
 
 // Calculate distance from central hub before saving
 locationSchema.pre("save", function (next) {
-  this.updatedAt = Date.now()
+  this.updatedAt = Date.now();
 
   // Calculate distance using Haversine formula
-  const R = 6371e3 // Earth's radius in meters
-  const φ1 = (this.centralHub.latitude * Math.PI) / 180
-  const φ2 = (this.coordinates.latitude * Math.PI) / 180
-  const Δφ = ((this.coordinates.latitude - this.centralHub.latitude) * Math.PI) / 180
-  const Δλ = ((this.coordinates.longitude - this.centralHub.longitude) * Math.PI) / 180
+  const R = 6371e3; // Earth's radius in meters
+  const φ1 = (this.centralHub.latitude * Math.PI) / 180;
+  const φ2 = (this.coordinates.latitude * Math.PI) / 180;
+  const Δφ =
+    ((this.coordinates.latitude - this.centralHub.latitude) * Math.PI) / 180;
+  const Δλ =
+    ((this.coordinates.longitude - this.centralHub.longitude) * Math.PI) / 180;
 
-  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2)
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  const a =
+    Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
-  this.distanceFromCentralHub = Math.round(R * c) // Distance in meters
+  this.distanceFromCentralHub = Math.round(R * c); // Distance in meters
 
-  next()
-})
+  next();
+});
 
-module.exports = mongoose.model("Location", locationSchema)
+module.exports = mongoose.model("Location", locationSchema);
