@@ -11,3 +11,7 @@ export const AutoCompleteApi = (searchQuery) => {
 export const FetchPlaceApi = (placeId) => {
   return `https://api.olamaps.io/places/v1/details?place_id=${placeId}&api_key=${API_KEY}`;
 };
+
+export const ReverseGeoCodeApi = (coords) => {
+  return `https://api.olamaps.io/places/v1/reverse-geocode?latlng=${coords.latitude},${coords.longitude}&api_key=${API_KEY}`;
+};
