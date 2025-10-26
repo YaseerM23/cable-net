@@ -43,6 +43,7 @@ const adminSchema = new mongoose.Schema({
 });
 
 const Admin = mongoose.model("Admin", adminSchema);
+module.exports = Admin;
 
 // JWT Middleware
 const authenticateToken = (req, res, next) => {

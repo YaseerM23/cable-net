@@ -4,6 +4,7 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 import { DataTable } from "../components/DataTable";
+import useUserStore from "../store/adminStore";
 
 const Locations = () => {
   const [locations, setLocations] = useState([]);
@@ -35,6 +36,7 @@ const Locations = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
+  const { user, setUser } = useUserStore();
 
   useEffect(() => {
     fetchData();
@@ -196,10 +198,13 @@ const Locations = () => {
   const handleDelete = async (id) => {
     if (window.confirm("Are you sure you want to delete this location?")) {
       try {
-        await axios.delete(`/api/locations/${id}`);
+        const { data } = await axios.delete(`/api/locations/${id}/${user.id}`);
+        setUser(data.updatedUser);
+        localStorage.setItem("auth", JSON.stringify(data.updatedUser));
         setSuccess("Location deleted successfully");
         fetchData();
       } catch (error) {
+        console.log("Error While Delete LOcaiotn : ", error);
         setError("Failed to delete location");
       }
     }
