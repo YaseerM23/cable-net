@@ -747,7 +747,7 @@ const NetworkMap = () => {
             ])
             .addTo(map);
         }
-        if (user.geojson) {
+        if (user.geojson && user.geojson !== "null") {
           // Add or update source
           const geojson = user.geojson;
           if (!map.getSource("routes")) {
