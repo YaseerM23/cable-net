@@ -2,6 +2,8 @@ const express = require("express");
 const router = express.Router();
 const Location = require("../models/Location");
 const upload = require("../middleware/upload");
+// const Admin = require("./models/Admin");
+const Admin = require("../server");
 
 // Get all locations
 router.get("/", async (req, res) => {
@@ -99,13 +101,57 @@ router.put("/:id", async (req, res) => {
 });
 
 // Delete location
-router.delete("/:id", async (req, res) => {
+router.delete("/:id/:adminId", async (req, res) => {
   try {
-    const location = await Location.findByIdAndDelete(req.params.id);
-    if (!location) {
+    const { id, adminId } = req.params;
+
+    // 1️⃣ Find and delete the location
+    const deletedLocation = await Location.findOneAndDelete({ _id: id });
+
+    if (!deletedLocation) {
       return res.status(404).json({ message: "Location not found" });
     }
-    res.json({ message: "Location deleted successfully" });
+
+    // 2️⃣ Extract coordinates from deleted location
+    const { latitude, longitude } = deletedLocation.coordinates;
+
+    console.log("latitude, longitude", latitude, longitude);
+
+    // 3️⃣ Find the admin
+    const admin = await Admin.findById(adminId);
+    if (!admin || !admin.geojson) {
+      return res.status(404).json({ message: "Admin or geojson not found" });
+    }
+
+    // 4️⃣ Remove that specific coordinate from admin.geojson.features (if it's a FeatureCollection)
+    if (
+      admin.geojson.type === "FeatureCollection" &&
+      Array.isArray(admin.geojson.features)
+    ) {
+      // console.log("INside If statement : ", admin.geojson.features);
+
+      admin.geojson.features = admin.geojson.features.filter((feature) => {
+        const { longitude: lng, latitude: lat } = feature.coordinates;
+
+        if (lng === longitude && lat === latitude)
+          console.log("Same Got : ", deletedLocation);
+
+        return !(lng === longitude && lat === latitude);
+      });
+    }
+
+    // 5️⃣ Save admin document
+    await admin.save();
+
+    res.json({
+      message: "Location deleted and geojson updated successfully",
+      updatedUser: {
+        id: admin._id,
+        username: admin.username,
+        role: admin.role,
+        geojson: admin.geojson,
+      },
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
