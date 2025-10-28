@@ -404,12 +404,12 @@ const Locations = () => {
                 ></path>
               </svg>
             </div>
-            <button
+            {/* <button
               className="flex-shrink-0 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition-colors"
               onClick={() => setShowForm(!showForm)}
             >
               {showForm ? "Cancel" : "➕ Add New"}
-            </button>
+            </button> */}
           </div>
         </div>
 

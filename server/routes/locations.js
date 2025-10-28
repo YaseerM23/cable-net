@@ -105,8 +105,8 @@ router.put(
         serviceType: req.body.serviceType,
         notes: req.body.notes,
         coordinates: {
-          latitude: parseFloat(req.body.latitude),
-          longitude: parseFloat(req.body.longitude),
+          latitude: parseFloat(req.body.coordinates.latitude),
+          longitude: parseFloat(req.body.coordinates.longitude),
         },
       };
 
