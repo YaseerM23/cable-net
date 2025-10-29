@@ -140,51 +140,43 @@ router.delete("/:id/:adminId", async (req, res) => {
   try {
     const { id, adminId } = req.params;
 
-    // 1️⃣ Find and delete the location
+    // 1️. Find and delete the location
     const deletedLocation = await Location.findOneAndDelete({ _id: id });
 
     if (!deletedLocation) {
       return res.status(404).json({ message: "Location not found" });
     }
 
-    // 2️⃣ Extract coordinates from deleted location
+    // 2️. Extract coordinates from deleted location
     const { latitude, longitude } = deletedLocation.coordinates;
 
-    console.log("latitude, longitude", latitude, longitude);
-
-    // 3️⃣ Find the admin
+    // 3️. Find the admin
     const admin = await Admin.findById(adminId);
     if (!admin || !admin.geojson) {
       return res.status(404).json({ message: "Admin or geojson not found" });
     }
 
-    // 4️⃣ Remove that specific coordinate from admin.geojson.features (if it's a FeatureCollection)
-    if (
-      admin.geojson.type === "FeatureCollection" &&
-      Array.isArray(admin.geojson.features)
-    ) {
-      // console.log("INside If statement : ", admin.geojson.features);
-
-      admin.geojson.features = admin.geojson.features.filter((feature) => {
-        const { longitude: lng, latitude: lat } = feature.coordinates;
-
-        if (lng === longitude && lat === latitude)
-          console.log("Same Got : ", deletedLocation);
-
-        return !(lng === longitude && lat === latitude);
-      });
-    }
-
-    // 5️⃣ Save admin document
-    await admin.save();
+    // 4️. Remove that specific coordinate from admin.geojson.features (if it's a FeatureCollection)
+    const updatedAdmin = await Admin.findByIdAndUpdate(
+      adminId,
+      {
+        $pull: {
+          "geojson.features": {
+            "coordinates.longitude": longitude,
+            "coordinates.latitude": latitude,
+          },
+        },
+      },
+      { new: true }
+    );
 
     res.json({
       message: "Location deleted and geojson updated successfully",
       updatedUser: {
-        id: admin._id,
-        username: admin.username,
-        role: admin.role,
-        geojson: admin.geojson,
+        id: updatedAdmin._id,
+        username: updatedAdmin.username,
+        role: updatedAdmin.role,
+        geojson: updatedAdmin.geojson,
       },
     });
   } catch (error) {

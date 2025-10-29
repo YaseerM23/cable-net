@@ -30,7 +30,6 @@ const NetworkMap = () => {
   const [showRoutes, setShowRoutes] = useState(true); // 👈 Route visibility state
   const { map, olaMaps } = useMap();
   const { user, setUser } = useUserStore();
-  // console.log("The geojson : ", user.geojson);
 
   const mapRef = useRef(null);
   const olaMapsRef = useRef(null);
@@ -45,7 +44,10 @@ const NetworkMap = () => {
   }, [olaMaps]);
 
   useEffect(() => {
-    if (user) userRef.current = user;
+    if (user) {
+      console.log("The geojson : ", user.geojson);
+      userRef.current = user;
+    }
   }, [user]);
 
   const isMapLoaded = useRef(false);
@@ -1110,6 +1112,28 @@ const NetworkMap = () => {
     setShowAddModal(true);
   };
 
+  // Function to update route data
+  const updateRoutes = (updatedGeojson) => {
+    if (map && map.getSource("routes")) {
+      map.getSource("routes").setData(updatedGeojson);
+    } else {
+      // if source doesn't exist yet, create it
+      map.addSource("routes", {
+        type: "geojson",
+        data: updatedGeojson,
+      });
+      map.addLayer({
+        id: "routes",
+        type: "line",
+        source: "routes",
+        paint: {
+          "line-color": "#6BCF7F",
+          "line-width": 3,
+        },
+      });
+    }
+  };
+
   const handleLocationCreated = async (newLocation) => {
     try {
       if (newLocation.image && newLocation.image.startsWith("/uploads")) {
@@ -1151,6 +1175,7 @@ const NetworkMap = () => {
         const updateUser = geojsonResponse.data.user;
         setUser(updateUser);
         localStorage.setItem("auth", JSON.stringify(updateUser));
+        console.log("Locaiton Added REs : ", updateUser.geojson);
 
         const markerElement = createLocationMarkerElement(newLocation);
         markerElement.classList.add("location-marker");
@@ -1162,13 +1187,12 @@ const NetworkMap = () => {
           ])
           .addTo(map);
 
-        map.getSource("routes").setData(updatedGeoJSON); // redraw
-
         setAllLocations((prev) => [...prev, newLocation]);
         setSuccess("Location added successfully!");
         setTimeout(() => {
           if (map && olaMaps && isMapLoaded.current) {
-            renderConnections([...allLocations, newLocation]);
+            updateRoutes(updateUser.geojson);
+            // renderConnections([...allLocations, newLocation]);
           }
         }, 100);
         setTimeout(() => setSuccess(""), 3000);
