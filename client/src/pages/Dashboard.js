@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import axios from "axios";
+import axios from "../components/axios"; // Adjust the path as necessary
 import { useNavigate } from "react-router-dom";
 import NetworkAnalytics from "../components/NetworkAnalytics";
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import axios from "axios";
+import axios from "../components/axios"; // Adjust the path as necessary
 import { DataTable } from "../components/DataTable";
 
 const Services = () => {

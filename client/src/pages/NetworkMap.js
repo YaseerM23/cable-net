@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import axios from "axios";
+import axios from "../components/axios"; // Adjust the path as necessary
 import AddLocationModal from "../components/AddLocationModal";
 import NetworkAnalytics from "../components/NetworkAnalytics";
 import AdvancedFilters from "../components/AdvancedFilters";

@@ -1,7 +1,8 @@
 "use client";
 
 import { createContext, useState, useContext, useEffect } from "react";
-import axios from "axios";
+// import axios from "axios";
+import axios from "../components/axios"; // Adjust the path as necessary
 
 const AuthContext = createContext();
 
