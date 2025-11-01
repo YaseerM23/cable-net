@@ -12,37 +12,44 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-// Serve uploaded files statically
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// MongoDB Connection
-const MONGODB_URI =
-  "mongodb+srv://fazil:fazil@cluster0.zcl0jad.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
+// ✅ Use environment variable for DB connection
+const MONGODB_URI = process.env.MONGODB_URI;
 
-mongoose
-  .connect(MONGODB_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  })
-  .then(() => console.log("MongoDB connected successfully"))
-  .catch((err) => console.error("MongoDB connection error:", err));
+// ✅ Maintain a single global connection (important for Vercel)
+let isConnected = false;
+const connectDB = async () => {
+  if (isConnected) return;
+  try {
+    const conn = await mongoose.connect(MONGODB_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+    isConnected = conn.connections[0].readyState === 1;
+    console.log("✅ MongoDB connected successfully");
+    await initializeAdmin();
+  } catch (err) {
+    console.error("❌ MongoDB connection error:", err);
+  }
+};
+
+connectDB(); // Call once on startup
 
 // JWT Secret
 const JWT_SECRET = process.env.JWT_SECRET || "cable_network_secret_key_2024";
 
-// Admin Schema (for predefined credentials)
+// Admin Schema
 const adminSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true },
   password: { type: String, required: true },
   role: { type: String, default: "admin" },
   createdAt: { type: Date, default: Date.now },
-  geojson: {
-    type: Object,
-    default: null,
-  },
+  geojson: { type: Object, default: null },
 });
 
-const Admin = mongoose.model("Admin", adminSchema);
+const Admin = mongoose.models.Admin || mongoose.model("Admin", adminSchema);
+
 module.exports = Admin;
 
 // JWT Middleware
@@ -50,14 +57,11 @@ const authenticateToken = (req, res, next) => {
   const authHeader = req.headers["authorization"];
   const token = authHeader && authHeader.split(" ")[1];
 
-  if (!token) {
-    return res.status(401).json({ message: "Access token required" });
-  }
+  if (!token) return res.status(401).json({ message: "Access token required" });
 
   jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) {
+    if (err)
       return res.status(403).json({ message: "Invalid or expired token" });
-    }
     req.user = user;
     next();
   });
@@ -67,32 +71,24 @@ const authenticateToken = (req, res, next) => {
 app.post("/api/auth/login", async (req, res) => {
   try {
     const { username, password } = req.body;
+    await connectDB(); // ensure DB is connected
 
-    if (!username || !password) {
+    if (!username || !password)
       return res
         .status(400)
-        .json({ message: "Username and password are required" });
-    }
+        .json({ message: "Username and password required" });
 
-    // Find admin
     const admin = await Admin.findOne({ username });
-    if (!admin) {
-      return res.status(401).json({ message: "Invalid credentials" });
-    }
+    if (!admin) return res.status(401).json({ message: "Invalid credentials" });
 
-    // Check password
     const isValidPassword = await bcrypt.compare(password, admin.password);
-    if (!isValidPassword) {
-      return res.status(401).json({ message: "password Invalid credentials" });
-    }
+    if (!isValidPassword)
+      return res.status(401).json({ message: "Invalid credentials" });
 
-    // Generate JWT token
     const token = jwt.sign(
       { id: admin._id, username: admin.username, role: admin.role },
       JWT_SECRET,
-      {
-        expiresIn: "24h",
-      }
+      { expiresIn: "24h" }
     );
 
     res.json({
@@ -111,18 +107,15 @@ app.post("/api/auth/login", async (req, res) => {
   }
 });
 
+// GeoJSON Update Route
 app.put("/api/admin/:adminId/geojson", async (req, res) => {
   try {
     const { geojson } = req.body;
     const { adminId } = req.params;
+    await connectDB();
 
-    if (!adminId) {
-      return res.status(400).json({ message: "Admin ID is required" });
-    }
-
-    if (!geojson || typeof geojson !== "object") {
-      return res.status(400).json({ message: "Valid GeoJSON data required" });
-    }
+    if (!geojson || typeof geojson !== "object")
+      return res.status(400).json({ message: "Valid GeoJSON required" });
 
     const updatedAdmin = await Admin.findByIdAndUpdate(
       adminId,
@@ -130,9 +123,8 @@ app.put("/api/admin/:adminId/geojson", async (req, res) => {
       { new: true, runValidators: true }
     );
 
-    if (!updatedAdmin) {
+    if (!updatedAdmin)
       return res.status(404).json({ message: "Admin not found" });
-    }
 
     res.status(200).json({
       message: "GeoJSON updated successfully",
@@ -149,33 +141,32 @@ app.put("/api/admin/:adminId/geojson", async (req, res) => {
   }
 });
 
-// Verify token route
+// Token Verify Route
 app.get("/api/auth/verify", authenticateToken, (req, res) => {
+  res.json({ message: "Token is valid", user: req.user });
+});
+
+// Health Check
+app.get("/api/health", (req, res) => {
   res.json({
-    message: "Token is valid",
-    user: req.user,
+    message: "Cable Network Management API is running",
+    timestamp: new Date().toISOString(),
   });
 });
 
-// Protected route example
-app.get("/api/dashboard", authenticateToken, (req, res) => {
-  res.json({
-    message:
-      "Welcome to Silver Star Network Management - Developed by SoloCompilers",
-    user: req.user,
-  });
-});
-
+// Import routes (if needed)
 const serviceRoutes = require("./routes/services");
 const serviceTypeRoutes = require("./routes/serviceTypes");
 const locationRoutes = require("./routes/locations");
+// const locationNameRoutes = require("./routes/locationNames");
 
+// app.use("/api/location-names", authenticateToken, locationNameRoutes);
 app.use("/api/services", authenticateToken, serviceRoutes);
 app.use("/api/service-types", authenticateToken, serviceTypeRoutes);
 app.use("/api/locations", authenticateToken, locationRoutes);
 
 // Initialize default admin (run once)
-const initializeAdmin = async () => {
+async function initializeAdmin() {
   try {
     const existingAdmin = await Admin.findOne({ username: "admin" });
     if (!existingAdmin) {
@@ -191,22 +182,11 @@ const initializeAdmin = async () => {
   } catch (error) {
     console.error("Error initializing admin:", error);
   }
-};
+}
 
-// Initialize admin on server start
-initializeAdmin();
-
-// Health check route
-app.get("/api/health", (req, res) => {
-  res.json({
-    message: "Cable Network Management API is running",
-    timestamp: new Date().toISOString(),
-  });
-});
-
+// Start server (for local only)
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 
+// ✅ Export app for Vercel
 module.exports = app;
