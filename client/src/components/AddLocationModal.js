@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import axios from "../components/axios";
+import axios from "axios";
 
 const AddLocationModal = ({
   isOpen,
@@ -71,8 +71,18 @@ const AddLocationModal = ({
   const fetchData = async () => {
     try {
       const [servicesRes, serviceTypesRes] = await Promise.all([
-        axios.get("/api/services"),
-        axios.get("/api/service-types"),
+        axios.get(
+          "https://cable-net-complete-backend.vercel.app/api/services",
+          {
+            withCredentials: true,
+          }
+        ),
+        axios.get(
+          "https://cable-net-complete-backend.vercel.app/api/service-types",
+          {
+            withCredentials: true,
+          }
+        ),
       ]);
       setServices(servicesRes.data);
       setServiceTypes(serviceTypesRes.data);
@@ -138,11 +148,17 @@ const AddLocationModal = ({
         ...(image2Url && { image2: image2Url }),
       };
 
-      const response = await axios.post("/api/locations", locationData, {
-        headers: {
-          "Content-Type": "application/json", // ✅ Force JSON
-        },
-      });
+      console.log("Submitting location data:", locationData);
+
+      const response = await axios.post(
+        "https://cable-net-complete-backend.vercel.app/api/locations",
+        locationData,
+        {
+          headers: { "Content-Type": "application/json" },
+          withCredentials: true,
+        }
+      );
+
       onLocationCreated(response.data);
       onClose();
     } catch (err) {
