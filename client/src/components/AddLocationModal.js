@@ -2,8 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-// import axios from "axios";
-import axios from "../components/axios"; // Adjust the path as necessary
+import axios from "../components/axios";
 
 const AddLocationModal = ({
   isOpen,
@@ -26,15 +25,34 @@ const AddLocationModal = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // ✅ Cloudinary Upload (Hardcoded)
+  const uploadToCloudinary = async (file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("upload_preset", "react_upload_preset"); // ← Replace with your preset
+    formData.append("cloud_name", "dgixdcqvh"); // ← Replace with your cloud name
+
+    const res = await fetch(
+      "https://api.cloudinary.com/v1_1/dgixdcqvh/image/upload",
+      {
+        method: "POST",
+        body: formData,
+      }
+    );
+
+    const data = await res.json();
+    if (data.secure_url) return data.secure_url;
+    throw new Error(data.error?.message || "Upload failed");
+  };
+
   useEffect(() => {
     if (isOpen) {
       fetchData();
-      // Reset form when modal opens
       setFormData({ serviceName: "", serviceType: "", notes: "" });
       setImageFile(null);
-      setImageFile2(null); // 👈 reset
+      setImageFile2(null);
       setImagePreview(null);
-      setImagePreview2(null); // 👈 reset
+      setImagePreview2(null);
       setError("");
     }
   }, [isOpen]);
@@ -81,7 +99,6 @@ const AddLocationModal = ({
     }
   };
 
-  // Handle second image
   const handleImageChange2 = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -104,25 +121,28 @@ const AddLocationModal = ({
     setLoading(true);
     setError("");
 
-    const formDataToSend = new FormData();
-    formDataToSend.append("serviceName", formData.serviceName);
-    formDataToSend.append("serviceType", formData.serviceType);
-    if (formData.notes) formDataToSend.append("notes", formData.notes);
-    formDataToSend.append("latitude", coordinates.latitude);
-    formDataToSend.append("longitude", coordinates.longitude);
-    if (imageFile) formDataToSend.append("image", imageFile);
-    if (imageFile2) formDataToSend.append("image2", imageFile2); // 👈
-
     try {
-      const response = await axios.post("/api/locations", formDataToSend, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      });
+      let image1Url = null;
+      let image2Url = null;
+
+      if (imageFile) image1Url = await uploadToCloudinary(imageFile);
+      if (imageFile2) image2Url = await uploadToCloudinary(imageFile2);
+
+      const locationData = {
+        serviceName: formData.serviceName,
+        serviceType: formData.serviceType,
+        notes: formData.notes,
+        latitude: coordinates.latitude,
+        longitude: coordinates.longitude,
+        ...(image1Url && { image: image1Url }),
+        ...(image2Url && { image2: image2Url }),
+      };
+
+      const response = await axios.post("/api/locations", locationData);
       onLocationCreated(response.data);
       onClose();
-    } catch (error) {
-      setError(error.response?.data?.message || "Failed to create location");
+    } catch (err) {
+      setError(err.message || "Failed to create location");
     } finally {
       setLoading(false);
     }
@@ -287,7 +307,6 @@ const AddLocationModal = ({
             </select>
           </div>
 
-          {/* 👇 REPLACED URL INPUT WITH FILE UPLOAD */}
           <div style={{ marginBottom: "20px" }}>
             <label
               style={{
@@ -299,15 +318,7 @@ const AddLocationModal = ({
             >
               Upload Image (Optional, max 5MB)
             </label>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleImageChange}
-              style={{
-                width: "100%",
-                padding: "8px 0",
-              }}
-            />
+            <input type="file" accept="image/*" onChange={handleImageChange} />
             {imagePreview && (
               <div style={{ marginTop: "10px", textAlign: "center" }}>
                 <img

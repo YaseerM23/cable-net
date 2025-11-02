@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import axios from "../components/axios"; // Adjust the path as necessary
+import axios from "../components/axios";
 import { DataTable } from "../components/DataTable";
 import useUserStore from "../store/adminStore";
 
@@ -21,22 +21,42 @@ const Locations = () => {
   const [formData, setFormData] = useState({
     serviceName: "",
     serviceType: "",
-    image: "", // Will store relative path or empty string
-    image2: "", // 👈
+    image: "",
+    image2: "",
     notes: "",
     coordinates: {
       latitude: "",
       longitude: "",
     },
   });
-  const [imageFile, setImageFile] = useState(null); // For new upload
-  const [imagePreview, setImagePreview] = useState(null); // Preview of uploaded image
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const { user, setUser } = useUserStore();
+
+  // ✅ Cloudinary Upload Function (Hardcoded)
+  const uploadToCloudinary = async (file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("upload_preset", "react_upload_preset"); // ← Replace with your preset name
+    formData.append("cloud_name", "dgixdcqvh"); // ← Replace with your cloud name
+
+    const res = await fetch(
+      "https://api.cloudinary.com/v1_1/dgixdcqvh/image/upload",
+      {
+        method: "POST",
+        body: formData,
+      }
+    );
+
+    const data = await res.json();
+    if (data.secure_url) return data.secure_url;
+    throw new Error(data.error?.message || "Upload failed");
+  };
 
   useEffect(() => {
     fetchData();
@@ -45,7 +65,7 @@ const Locations = () => {
   useEffect(() => {
     if (formData.serviceName) {
       const filtered = serviceTypes.filter(
-        (st) => st.service._id === formData.serviceName
+        (st) => st.service?._id === formData.serviceName
       );
       setFilteredServiceTypes(filtered);
     } else {
@@ -61,18 +81,8 @@ const Locations = () => {
         axios.get("/api/service-types"),
       ]);
 
-      // Fix image URLs for all locations
-      const fixedLocations = locationsRes.data.map((loc) => {
-        if (loc.image && loc.image.startsWith("/uploads")) {
-          return {
-            ...loc,
-            image: `${API_BASE_URL}${loc.image}`,
-          };
-        }
-        return loc;
-      });
-
-      setLocations(fixedLocations);
+      // Cloudinary URLs are already absolute — no fix needed
+      setLocations(locationsRes.data);
       setServices(servicesRes.data);
       setServiceTypes(serviceTypesRes.data);
     } catch (error) {
@@ -105,62 +115,36 @@ const Locations = () => {
       return;
     }
 
-    const locationData = {
-      serviceName: formData.serviceName,
-      serviceType: formData.serviceType,
-      notes: formData.notes,
-      coordinates: { latitude: lat, longitude: lng },
-    };
-
     try {
+      let image1Url = formData.image; // Keep existing if not uploading new
+      let image2Url = formData.image2;
+
+      // Upload new images if selected
+      if (imageFile) {
+        image1Url = await uploadToCloudinary(imageFile);
+      }
+      if (imageFile2) {
+        image2Url = await uploadToCloudinary(imageFile2);
+      }
+
+      const locationData = {
+        serviceName: formData.serviceName,
+        serviceType: formData.serviceType,
+        notes: formData.notes,
+        latitude: lat,
+        longitude: lng,
+        ...(image1Url !== undefined && { image: image1Url }),
+        ...(image2Url !== undefined && { image2: image2Url }),
+      };
+
       let response;
-
       if (editingLocation) {
-        // If updating and no new image → send JSON
-        if (!imageFile) {
-          response = await axios.put(
-            `/api/locations/${editingLocation._id}`,
-            locationData
-          );
-        } else {
-          // If updating AND uploading new image → send FormData
-          const formDataToSend = new FormData();
-          formDataToSend.append("serviceName", formData.serviceName);
-          formDataToSend.append("serviceType", formData.serviceType);
-          formDataToSend.append("notes", formData.notes);
-          formDataToSend.append("latitude", lat.toString());
-          formDataToSend.append("longitude", lng.toString());
-          formDataToSend.append("image", imageFile);
-          formDataToSend.append("image2", imageFile2);
-
-          response = await axios.put(
-            `/api/locations/${editingLocation._id}`,
-            formDataToSend,
-            {
-              headers: {
-                "Content-Type": "multipart/form-data",
-              },
-            }
-          );
-        }
+        response = await axios.put(
+          `/api/locations/${editingLocation._id}`,
+          locationData
+        );
       } else {
-        // Creating new location
-        const formDataToSend = new FormData();
-        formDataToSend.append("serviceName", formData.serviceName);
-        formDataToSend.append("serviceType", formData.serviceType);
-        formDataToSend.append("notes", formData.notes);
-        formDataToSend.append("latitude", lat.toString());
-        formDataToSend.append("longitude", lng.toString());
-        if (imageFile) {
-          formDataToSend.append("image", imageFile);
-        }
-        if (imageFile2) formDataToSend.append("image2", imageFile2); // 👈
-
-        response = await axios.post("/api/locations", formDataToSend, {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        });
+        response = await axios.post("/api/locations", locationData);
       }
 
       setSuccess(
@@ -170,8 +154,9 @@ const Locations = () => {
       );
       fetchData();
       resetForm();
-    } catch (error) {
-      setError(error.response?.data?.message || "Operation failed");
+    } catch (err) {
+      console.error("Submission error:", err);
+      setError(err.message || "Operation failed");
     }
   };
 
@@ -180,7 +165,7 @@ const Locations = () => {
     setFormData({
       serviceName: location.serviceName?._id || "",
       serviceType: location.serviceType?._id || "",
-      image: location.image || "", // Store full URL or empty
+      image: location.image || "",
       image2: location.image2 || "",
       notes: location.notes || "",
       coordinates: {
@@ -189,7 +174,7 @@ const Locations = () => {
       },
     });
     setImageFile(null);
-    setImageFile2(null); // 👈
+    setImageFile2(null);
     setImagePreview(null);
     setImagePreview2(null);
     setShowForm(true);
@@ -204,7 +189,7 @@ const Locations = () => {
         setSuccess("Location deleted successfully");
         fetchData();
       } catch (error) {
-        console.log("Error While Delete LOcaiotn : ", error);
+        console.log("Error While Delete Location: ", error);
         setError("Failed to delete location");
       }
     }
@@ -215,11 +200,14 @@ const Locations = () => {
       serviceName: "",
       serviceType: "",
       image: "",
+      image2: "",
       notes: "",
       coordinates: { latitude: "", longitude: "" },
     });
     setImageFile(null);
+    setImageFile2(null);
     setImagePreview(null);
+    setImagePreview2(null);
     setEditingLocation(null);
     setShowForm(false);
   };
@@ -248,30 +236,6 @@ const Locations = () => {
     }
   };
 
-  const handleImageChange2 = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        setError("Image size must be less than 5MB");
-        return;
-      }
-      if (!file.type.startsWith("image/")) {
-        setError("Only image files are allowed");
-        return;
-      }
-      setImageFile2(file);
-      setImagePreview2(URL.createObjectURL(file));
-      setError("");
-    }
-  };
-
-  const removeImage2 = () => {
-    setImageFile2(null);
-    setImagePreview2(null);
-    setFormData({ ...formData, image2: "" });
-    setError("");
-  };
-
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -289,14 +253,34 @@ const Locations = () => {
     }
   };
 
+  const handleImageChange2 = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        setError("Image size must be less than 5MB");
+        return;
+      }
+      if (!file.type.startsWith("image/")) {
+        setError("Only image files are allowed");
+        return;
+      }
+      setImageFile2(file);
+      setImagePreview2(URL.createObjectURL(file));
+      setError("");
+    }
+  };
+
   const removeImage = () => {
     setImageFile(null);
     setImagePreview(null);
-    setFormData({ ...formData, image: "" }); // Clear image field
-    setError("");
   };
 
-  // Pagination & Search Logic
+  const removeImage2 = () => {
+    setImageFile2(null);
+    setImagePreview2(null);
+  };
+
+  // Pagination & Search Logic (unchanged)
   const filteredLocations = locations.filter((location) => {
     const serviceName = location.serviceName?.name || "";
     const serviceType = location.serviceType?.name || "";
@@ -316,31 +300,12 @@ const Locations = () => {
     indexOfFirstItem,
     indexOfLastItem
   );
-
   const totalPages = Math.ceil(filteredLocations.length / itemsPerPage);
 
-  const handlePageChange = (pageNumber) => {
-    setCurrentPage(pageNumber);
-  };
+  const handlePageChange = (pageNumber) => setCurrentPage(pageNumber);
 
   const renderPagination = () => {
     if (totalPages <= 1) return null;
-    const pages = [];
-    for (let i = 1; i <= totalPages; i++) {
-      pages.push(
-        <button
-          key={i}
-          onClick={() => handlePageChange(i)}
-          className={`px-4 py-2 mx-1 rounded-lg transition-colors ${
-            i === currentPage
-              ? "bg-blue-600 text-white font-semibold"
-              : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-          }`}
-        >
-          {i}
-        </button>
-      );
-    }
     return (
       <div className="flex justify-center mt-6">
         <button
@@ -350,7 +315,19 @@ const Locations = () => {
         >
           Previous
         </button>
-        {pages}
+        {[...Array(totalPages)].map((_, i) => (
+          <button
+            key={i + 1}
+            onClick={() => handlePageChange(i + 1)}
+            className={`px-4 py-2 mx-1 rounded-lg transition-colors ${
+              i + 1 === currentPage
+                ? "bg-blue-600 text-white font-semibold"
+                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+            }`}
+          >
+            {i + 1}
+          </button>
+        ))}
         <button
           onClick={() => handlePageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
@@ -374,7 +351,6 @@ const Locations = () => {
   return (
     <div className="min-h-screen bg-gray-100 text-gray-900 p-4 sm:p-6 lg:p-8">
       <div className="bg-white shadow-lg rounded-2xl p-6 lg:p-8">
-        {/* Header and Search */}
         <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
           <h2 className="text-3xl font-bold text-gray-800 tracking-wide">
             Location Management
@@ -395,7 +371,6 @@ const Locations = () => {
                 className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
                 fill="currentColor"
                 viewBox="0 0 20 20"
-                xmlns="http://www.w3.org/2000/svg"
               >
                 <path
                   fillRule="evenodd"
@@ -404,16 +379,9 @@ const Locations = () => {
                 ></path>
               </svg>
             </div>
-            {/* <button
-              className="flex-shrink-0 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition-colors"
-              onClick={() => setShowForm(!showForm)}
-            >
-              {showForm ? "Cancel" : "➕ Add New"}
-            </button> */}
           </div>
         </div>
 
-        {/* Alerts */}
         {error && (
           <div className="mb-4 p-4 rounded-lg bg-red-100 text-red-700">
             {error}
@@ -425,7 +393,6 @@ const Locations = () => {
           </div>
         )}
 
-        {/* Form */}
         {showForm && (
           <form
             onSubmit={handleSubmit}
@@ -533,7 +500,7 @@ const Locations = () => {
               </button>
             </div>
 
-            {/* Image Upload Section */}
+            {/* Image 1 */}
             <div>
               <label className="block text-sm font-medium mb-2 text-gray-700">
                 Upload Image (Optional, max 5MB)
@@ -544,28 +511,11 @@ const Locations = () => {
                 onChange={handleImageChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
               />
-              {imagePreview && (
+              {(imagePreview || formData.image) && (
                 <div className="mt-3 flex items-center gap-4">
                   <img
-                    src={imagePreview}
+                    src={imagePreview || formData.image}
                     alt="Preview"
-                    className="h-20 w-20 object-cover rounded border border-gray-300"
-                  />
-                  <button
-                    type="button"
-                    onClick={removeImage}
-                    className="px-3 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
-                  >
-                    Remove Image
-                  </button>
-                </div>
-              )}
-              {/* Show current image if exists and no new upload */}
-              {!imagePreview && formData.image && (
-                <div className="mt-3 flex items-center gap-4">
-                  <img
-                    src={formData.image}
-                    alt="Current"
                     className="h-20 w-20 object-cover rounded border border-gray-300"
                   />
                   <button
@@ -579,6 +529,7 @@ const Locations = () => {
               )}
             </div>
 
+            {/* Image 2 */}
             <div>
               <label className="block text-sm font-medium mb-2 text-gray-700">
                 Upload Second Image (Optional, max 5MB)
@@ -589,27 +540,11 @@ const Locations = () => {
                 onChange={handleImageChange2}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
               />
-              {imagePreview2 && (
+              {(imagePreview2 || formData.image2) && (
                 <div className="mt-3 flex items-center gap-4">
                   <img
-                    src={imagePreview2}
+                    src={imagePreview2 || formData.image2}
                     alt="Preview 2"
-                    className="h-20 w-20 object-cover rounded border border-gray-300"
-                  />
-                  <button
-                    type="button"
-                    onClick={removeImage2}
-                    className="px-3 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
-                  >
-                    Remove Image
-                  </button>
-                </div>
-              )}
-              {!imagePreview2 && formData.image2 && (
-                <div className="mt-3 flex items-center gap-4">
-                  <img
-                    src={formData.image2}
-                    alt="Current 2"
                     className="h-20 w-20 object-cover rounded border border-gray-300"
                   />
                   <button
@@ -656,7 +591,6 @@ const Locations = () => {
           </form>
         )}
 
-        {/* Table */}
         <DataTable
           data={currentLocations}
           onEdit={handleEdit}
@@ -733,7 +667,6 @@ const Locations = () => {
           </div>
         )}
 
-        {/* Pagination */}
         {renderPagination()}
       </div>
     </div>
