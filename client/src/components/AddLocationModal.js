@@ -138,7 +138,11 @@ const AddLocationModal = ({
         ...(image2Url && { image2: image2Url }),
       };
 
-      const response = await axios.post("/api/locations", locationData);
+      const response = await axios.post("/api/locations", locationData, {
+        headers: {
+          "Content-Type": "application/json", // ✅ Force JSON
+        },
+      });
       onLocationCreated(response.data);
       onClose();
     } catch (err) {
